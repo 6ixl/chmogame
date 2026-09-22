@@ -4,7 +4,7 @@ const srv = http.createServer((req, res) => { let p = path.join(root, decodeURIC
 (async () => {
   const b = await chromium.launch(); const page = await b.newPage({ viewport: { width: 412, height: 915 } }); const errs = []; page.on('pageerror', e => errs.push(e.message));
   await page.goto('http://localhost:5181/'); await page.evaluate(() => Games.open(Games.list.find(g => g.id === 'cardarena'))); await page.waitForTimeout(400);
-  await page.click('text=Бой с ботом'); await page.waitForTimeout(300);
+  await page.click('text=⚔️ Бой'); await page.waitForTimeout(300);
   await page.click('#modal-root .btn.primary'); await page.waitForTimeout(800);
   // играем: тапаем карты и ставим юнитов
   for (let i = 0; i < 12; i++) {

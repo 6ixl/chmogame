@@ -253,3 +253,8 @@ textarea { -webkit-user-select: text; user-select: text; }
 .clk-row { display: flex; justify-content: space-between; background: var(--card); border-radius: 10px; padding: 8px 12px; font-size: 13px; }
 .clk-gold { position: absolute; font-size: 46px; cursor: pointer; animation: goldpulse 1s infinite alternate; filter: drop-shadow(0 0 12px #fbbf24); }
 @keyframes goldpulse { from { transform: scale(1) rotate(-8deg) } to { transform: scale(1.18) rotate(8deg) } }
+.ca-arena { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--card); border-radius: 12px; padding: 10px 12px; width: 100%; font-size: 13px; }
+.ca-arena.cur { background: var(--card2); outline: 2px solid var(--accent); }
+.ca-arena.lock { opacity: .6; }
+.ca-arena span { color: var(--muted); font-size: 12px; }
+.ca-nm { font-size: 8px; line-height: 1; color: var(--muted); text-align: center; }
