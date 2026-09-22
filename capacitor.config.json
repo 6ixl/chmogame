@@ -1,0 +1,12 @@
+{
+  "appId": "ru.chmogame.app",
+  "appName": "Чмогейм",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#0f0f1a"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

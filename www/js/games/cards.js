@@ -1,0 +1,172 @@
+/* Настольные и карточные, часть 2 */
+(function () {
+  const gridEl = (h, n, size, cls) => h('div', { class: 'pz-grid ' + (cls || ''), style: `grid-template-columns:repeat(${n},${size}px);grid-auto-rows:${size}px` });
+  const cellSize = (screen, n, max) => Math.floor(Math.min(screen.clientWidth - 30, max || 420) / n) - 3;
+  const stats = (api, id) => { const s = api.load(id + '_st', { w: 0, l: 0 }); return { s, win() { s.w++; api.store(id + '_st', s); api.best(id, s.w); }, lose() { s.l++; api.store(id + '_st', s); }, txt: () => `${s.w} · ${s.l}` }; };
+  const SUITS = ['♠', '♥', '♦', '♣'], RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  const deck = api => api.shuffle(SUITS.flatMap(s => RANKS.map((r, v) => ({ r, s, v: v + 2 }))));
+  const cardEl = (h, c, opts) => h('div', { class: 'card-face ' + ((opts && opts.cls) || ''), style: 'color:' + ('♥♦'.includes(c.s) ? '#f87171' : '#fff') + ';' + ((opts && opts.style) || ''), onclick: opts && opts.onclick }, c.r + c.s);
+
+  /* ---------- Пять в ряд (Гомоку) ---------- */
+  Games.register({ id: 'gomoku', title: 'Пять в ряд', icon: '⭕', cat: 'board', desc: 'Крестики-нолики на большом поле: собери 5', bestLabel: 'Побед',
+    mount(screen, api) {
+      const { h } = api; const N = 11; let b, over, cells, st = stats(api, 'gomoku');
+      function start() { b = Array(N * N).fill(0); over = false; render(); }
+      function render() { screen.innerHTML = ''; api.header(screen, [{ label: 'Вы ✕', value: '' }, { label: 'П · П', value: st.txt() }, { btn: '↻', onClick: start }]); const size = cellSize(screen, N, 420); const g = gridEl(h, N, size); cells = []; for (let i = 0; i < N * N; i++) { const el = h('div', { class: 'pz-cell', style: 'font-size:' + Math.round(size * .6) + 'px', onclick: () => play(i) }); cells.push(el); g.append(el); } screen.append(h('div', { class: 'game-area' }, g)); paint(); }
+      function paint() { cells.forEach((c, i) => { c.textContent = b[i] === 1 ? '✕' : b[i] === 2 ? '○' : ''; c.style.color = b[i] === 1 ? 'var(--accent2)' : 'var(--gold)'; }); }
+      function lineLen(g, i, p) { const r = Math.floor(i / N), c = i % N; let best = 0; for (const [dr, dc] of [[1, 0], [0, 1], [1, 1], [1, -1]]) { let n = 1; for (const s of [1, -1]) { let k = 1; while (true) { const rr = r + dr * k * s, cc = c + dc * k * s; if (rr < 0 || cc < 0 || rr >= N || cc >= N || g[rr * N + cc] !== p) break; n++; k++; } } best = Math.max(best, n); } return best; }
+      function play(i) { if (over || b[i]) return; b[i] = 1; api.sound('tap'); paint(); if (lineLen(b, i, 1) >= 5) { over = true; st.win(); api.end({ title: 'Победа!', reward: 30, onAgain: start }); return; } setTimeout(ai, 300); }
+      function ai() { let best = -1, bv = -Infinity; for (let i = 0; i < N * N; i++) { if (b[i]) continue; const r = Math.floor(i / N), c = i % N; let near = false; for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) { const rr = r + dr, cc = c + dc; if (rr >= 0 && cc >= 0 && rr < N && cc < N && b[rr * N + cc]) near = true; } if (!near && b.some(Boolean)) continue; b[i] = 2; const mine = lineLen(b, i, 2); b[i] = 1; const theirs = lineLen(b, i, 1); b[i] = 0; const v = (mine >= 5 ? 100000 : [0, 1, 10, 100, 1000][Math.min(4, mine)]) + (theirs >= 5 ? 50000 : [0, 1, 8, 90, 900][Math.min(4, theirs)]) + Math.random(); if (v > bv) { bv = v; best = i; } } if (best < 0) best = Math.floor(N * N / 2); b[best] = 2; api.sound('select'); paint(); if (lineLen(b, best, 2) >= 5) { over = true; st.lose(); api.end({ win: false, title: 'Компьютер собрал 5', onAgain: start }); } else if (!b.includes(0)) { over = true; api.end({ title: 'Ничья', reward: 5, onAgain: start }); } }
+      start();
+    } });
+
+  /* ---------- Ультимативные крестики-нолики ---------- */
+  Games.register({ id: 'ultttt', title: 'Крестики 3×3×3', icon: '🎯', cat: 'board', desc: 'Девять маленьких полей внутри большого', bestLabel: 'Побед',
+    mount(screen, api) {
+      const { h } = api; const L = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]]; let b, big, next, over, cells, st = stats(api, 'ultttt');
+      const winner = g => { for (const l of L) if (g[l[0]] && g[l[0]] === g[l[1]] && g[l[0]] === g[l[2]]) return g[l[0]]; return 0; };
+      function start() { b = Array.from({ length: 9 }, () => Array(9).fill(0)); big = Array(9).fill(0); next = -1; over = false; render(); }
+      function render() { screen.innerHTML = ''; api.header(screen, [{ label: 'Вы ✕', value: '' }, { label: 'П · П', value: st.txt() }, { btn: '↻', onClick: start }]); const size = Math.floor(Math.min(screen.clientWidth - 40, 380) / 9) - 2; const wrap = h('div', { style: 'display:grid;grid-template-columns:repeat(3,1fr);gap:8px' }); cells = []; for (let B = 0; B < 9; B++) { const sm = h('div', { class: 'pz-grid', style: `grid-template-columns:repeat(3,${size}px);grid-auto-rows:${size}px;gap:2px;padding:3px;border-radius:8px`, 'data-b': B }); const arr = []; for (let i = 0; i < 9; i++) { const el = h('div', { class: 'pz-cell', style: 'font-size:' + Math.round(size * .6) + 'px', onclick: () => play(B, i) }); arr.push(el); sm.append(el); } cells.push({ sm, arr }); wrap.append(sm); } screen.append(h('div', { class: 'game-area' }, wrap, h('div', { class: 'hint-text' }, 'Ход отправляет соперника в поле с тем же номером клетки'))); paint(); }
+      function paint() { cells.forEach(({ sm, arr }, B) => { sm.style.background = big[B] === 1 ? 'rgba(34,211,238,.35)' : big[B] === 2 ? 'rgba(251,191,36,.35)' : (next === -1 || next === B) && !over ? 'rgba(139,92,246,.35)' : 'transparent'; arr.forEach((el, i) => { el.textContent = b[B][i] === 1 ? '✕' : b[B][i] === 2 ? '○' : ''; el.style.color = b[B][i] === 1 ? 'var(--accent2)' : 'var(--gold)'; }); }); }
+      function legal(B, i) { return !over && !b[B][i] && !big[B] && (next === -1 || next === B); }
+      function apply(B, i, p) { b[B][i] = p; if (winner(b[B])) big[B] = p; else if (!b[B].includes(0)) big[B] = 3; next = big[i] ? -1 : i; }
+      function play(B, i) { if (!legal(B, i)) return; apply(B, i, 1); api.sound('tap'); paint(); if (end()) return; setTimeout(ai, 300); }
+      function ai() { const opts = []; for (let B = 0; B < 9; B++) for (let i = 0; i < 9; i++) if (legal(B, i)) opts.push([B, i]); if (!opts.length) { end(); return; } let best = opts[0], bv = -Infinity; for (const [B, i] of opts) { let v = Math.random(); const g = b[B].slice(); g[i] = 2; if (winner(g)) { v += 50; const bg = big.slice(); bg[B] = 2; if (winner(bg)) v += 1000; } g[i] = 1; if (winner(g)) v += 30; if (i === 4) v += 2; const nb = big[i] ? -1 : i; if (nb === -1) v -= 5; if (v > bv) { bv = v; best = [B, i]; } } apply(best[0], best[1], 2); api.sound('select'); paint(); end(); }
+      function end() { const w = winner(big.map(v => v === 3 ? 0 : v)); if (w || !big.includes(0)) { over = true; paint(); if (w === 1) { st.win(); api.end({ title: 'Победа!', reward: 35, onAgain: start }); } else if (w === 2) { st.lose(); api.end({ win: false, title: 'Компьютер выиграл', onAgain: start }); } else api.end({ title: 'Ничья', reward: 8, onAgain: start }); return true; } return false; }
+      start();
+    } });
+
+  /* ---------- Калах (манкала) ---------- */
+  Games.register({ id: 'mancala', title: 'Калах', icon: '🫘', cat: 'board', desc: 'Раскладывай камни по лункам, собирай в свой калах', bestLabel: 'Побед',
+    mount(screen, api) {
+      const { h } = api; let p, over, st = stats(api, 'mancala'), busy;
+      function start() { p = Array(14).fill(4); p[6] = 0; p[13] = 0; over = false; busy = false; render(); }
+      function render() { screen.innerHTML = ''; api.header(screen, [{ label: 'Вы', value: p[6] }, { label: 'ПК', value: p[13] }, { label: 'П · П', value: st.txt() }]); const pit = (i, mine) => h('div', { class: 'pit', style: mine ? 'background:#1f4d5c' : '', onclick: () => mine && move(i) }, p[i]); const row = (idx, mine) => h('div', { class: 'row', style: 'flex-wrap:nowrap' }, idx.map(i => pit(i, mine))); screen.append(h('div', { class: 'game-area', style: 'gap:10px' }, h('div', { class: 'row', style: 'flex-wrap:nowrap;gap:6px' }, h('div', { class: 'pit store' }, p[13]), h('div', { style: 'display:flex;flex-direction:column;gap:6px' }, row([12, 11, 10, 9, 8, 7], false), row([0, 1, 2, 3, 4, 5], true)), h('div', { class: 'pit store', style: 'background:#1f4d5c' }, p[6])), h('div', { class: 'hint-text' }, 'Ваши лунки — нижний ряд. Попал в свой калах — ходишь снова'))); }
+      function sow(i, me) { let n = p[i]; p[i] = 0; let k = i; while (n) { k = (k + 1) % 14; if ((me && k === 13) || (!me && k === 6)) continue; p[k]++; n--; } const own = me ? k >= 0 && k <= 5 : k >= 7 && k <= 12; if (own && p[k] === 1 && p[12 - k] > 0) { const store = me ? 6 : 13; p[store] += p[12 - k] + 1; p[12 - k] = 0; p[k] = 0; } return k === (me ? 6 : 13); }
+      function finish() { over = true; for (let i = 0; i < 6; i++) { p[6] += p[i]; p[i] = 0; } for (let i = 7; i < 13; i++) { p[13] += p[i]; p[i] = 0; } render(); if (p[6] > p[13]) { st.win(); api.end({ title: `Победа ${p[6]}:${p[13]}!`, reward: 30, onAgain: start }); } else if (p[13] > p[6]) { st.lose(); api.end({ win: false, title: `Поражение ${p[6]}:${p[13]}`, onAgain: start }); } else api.end({ title: 'Ничья', reward: 8, onAgain: start }); }
+      const empty = me => (me ? [0, 1, 2, 3, 4, 5] : [7, 8, 9, 10, 11, 12]).every(i => !p[i]);
+      function move(i) { if (over || busy || !p[i]) return; const again = sow(i, true); api.sound('tap'); render(); if (empty(true) || empty(false)) { finish(); return; } if (again) { api.toast('Ещё ход!'); return; } busy = true; setTimeout(aiTurn, 500); }
+      function aiTurn() { let again = true; while (again && !over) { const opts = [7, 8, 9, 10, 11, 12].filter(i => p[i]); if (!opts.length) break; let best = opts[0], bv = -Infinity; for (const i of opts) { const save = p.slice(); const a = sow(i, false); const v = p[13] - save[13] + (a ? 3 : 0) + Math.random(); p = save; if (v > bv) { bv = v; best = i; } } again = sow(best, false); api.sound('select'); if (empty(true) || empty(false)) { finish(); return; } } busy = false; render(); }
+      start();
+    } });
+
+  /* ---------- Уголки ---------- */
+  Games.register({ id: 'corners', title: 'Уголки', icon: '📐', cat: 'board', desc: 'Перебеги своими шашками в противоположный угол раньше ПК', bestLabel: 'Побед',
+    mount(screen, api) {
+      const { h } = api; const N = 8; let b, sel = -1, cells, over, st = stats(api, 'corners'), moves;
+      const home = p => { const s = new Set(); for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) s.add(p === 1 ? (N - 1 - r) * N + c : r * N + N - 1 - c); return s; };
+      const H1 = home(1), H2 = home(2);
+      function start() { b = Array(64).fill(0); H1.forEach(i => b[i] = 1); H2.forEach(i => b[i] = 2); sel = -1; over = false; moves = 0; render(); }
+      function targets(i) { const out = new Set(); const r = Math.floor(i / N), c = i % N; for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const rr = r + dr, cc = c + dc; if (rr < 0 || cc < 0 || rr >= N || cc >= N) continue; const k = rr * N + cc; if (!b[k]) out.add(k); } const seen = new Set([i]); const st2 = [i]; while (st2.length) { const k = st2.pop(); const kr = Math.floor(k / N), kc = k % N; for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const mr = kr + dr, mc = kc + dc, tr = kr + 2 * dr, tc = kc + 2 * dc; if (tr < 0 || tc < 0 || tr >= N || tc >= N) continue; const m = mr * N + mc, t = tr * N + tc; if (b[m] && !b[t] && !seen.has(t)) { seen.add(t); out.add(t); st2.push(t); } } } return out; }
+      function render() { screen.innerHTML = ''; api.header(screen, [{ label: 'Ходы', value: moves }, { label: 'П · П', value: st.txt() }, { btn: '↻', onClick: start }]); const size = cellSize(screen, N, 400); const g = gridEl(h, N, size); cells = []; for (let i = 0; i < 64; i++) { const el = h('div', { class: 'pz-cell', style: 'background:' + (H1.has(i) ? '#1f4d5c' : H2.has(i) ? '#5c2a3a' : (Math.floor(i / 8) + i) % 2 ? '#26264a' : '#1e1e33'), onclick: () => tap(i) }); cells.push(el); g.append(el); } screen.append(h('div', { class: 'game-area' }, g, h('div', { class: 'hint-text' }, 'Вы — голубые, цель — красный угол. Ход на соседнюю клетку или прыжки через шашки'))); paint(); }
+      function paint() { const t = sel >= 0 ? targets(sel) : new Set(); cells.forEach((el, i) => { el.innerHTML = ''; if (b[i]) el.append(h('div', { class: 'disc', style: 'background:' + (b[i] === 1 ? '#22d3ee' : '#f87171') })); el.style.outline = i === sel ? '3px solid #fff' : t.has(i) ? '3px solid var(--green)' : ''; }); }
+      function tap(i) { if (over) return; if (b[i] === 1) { sel = i; api.sound('tap'); paint(); return; } if (sel < 0 || !targets(sel).has(i)) return; b[i] = 1; b[sel] = 0; sel = -1; moves++; api.sound('select'); paint(); if ([...H2].every(k => b[k] === 1)) { over = true; st.win(); api.end({ title: 'Победа!', reward: 40, text: moves + ' ходов', onAgain: start }); return; } setTimeout(ai, 350); }
+      function ai() { let best = null, bv = -Infinity; for (let i = 0; i < 64; i++) { if (b[i] !== 2) continue; for (const t of targets(i)) { const d0 = Math.floor(i / N) + (N - 1 - i % N), d1 = Math.floor(t / N) + (N - 1 - t % N); let v = d1 - d0 + Math.random() * .5; if (H1.has(t)) v += 3; if (H2.has(i) && !H2.has(t)) v += 2; if (v > bv) { bv = v; best = [i, t]; } } } if (best) { b[best[1]] = 2; b[best[0]] = 0; } api.sound('select'); paint(); if ([...H1].every(k => b[k] === 2)) { over = true; st.lose(); api.end({ win: false, title: 'Компьютер добрался первым', onAgain: start }); } }
+      start();
+    } });
+
+  /* ---------- Свинья (кости) ---------- */
+  Games.register({ id: 'pig', title: 'Свинья', icon: '🐷', cat: 'board', desc: 'Кидай кубик, копи очки, но единица сжигает ход. До 50', bestLabel: 'Побед',
+    mount(screen, api) {
+      const { h } = api; let me, pc, turn, over, st = stats(api, 'pig'), last;
+      function start() { me = 0; pc = 0; turn = 0; over = false; last = '🎲'; render(); }
+      function render() { screen.innerHTML = ''; api.header(screen, [{ label: 'Вы', value: me }, { label: 'ПК', value: pc }, { label: 'П · П', value: st.txt() }]); screen.append(h('div', { class: 'game-area', style: 'gap:20px' }, h('div', { style: 'font-size:80px' }, last), h('div', { class: 'stat', style: 'font-size:18px' }, 'За ход: ', h('b', null, turn)), h('div', { class: 'row' }, h('button', { class: 'btn primary', style: 'font-size:18px', disabled: over, onclick: roll }, '🎲 Бросить'), h('button', { class: 'btn', style: 'font-size:18px', disabled: over || !turn, onclick: hold }, '✋ Хватит')), h('div', { class: 'hint-text' }, 'Выпала 1 — очки за ход сгорают. Первый до 50 побеждает'))); }
+      function roll() { const d = api.rand(1, 6); last = '⚀⚁⚂⚃⚄⚅'[d - 1]; api.sound('tap'); if (d === 1) { turn = 0; render(); api.toast('Единица! Ход сгорел'); setTimeout(aiTurn, 700); } else { turn += d; render(); } }
+      function hold() { me += turn; turn = 0; api.sound('good'); if (me >= 50) { over = true; st.win(); render(); api.end({ title: 'Победа!', reward: 20, onAgain: start }); return; } render(); setTimeout(aiTurn, 500); }
+      function aiTurn() { let t = 0; const step = () => { const d = api.rand(1, 6); last = '⚀⚁⚂⚃⚄⚅'[d - 1]; if (d === 1) { t = 0; render(); api.toast('У ПК сгорел ход'); return; } t += d; if (t >= 20 || pc + t >= 50) { pc += t; render(); if (pc >= 50) { over = true; st.lose(); api.end({ win: false, title: 'Компьютер набрал 50', onAgain: start }); } else api.toast('ПК взял ' + t); return; } render(); setTimeout(step, 350); }; step(); }
+      start();
+    } });
+
+  /* ---------- Фаркл ---------- */
+  Games.register({ id: 'farkle', title: 'Фаркл', icon: '🎲', cat: 'board', desc: 'Шесть кубиков: откладывай единицы, пятёрки и тройки', bestLabel: 'Рекорд',
+    mount(screen, api) {
+      const { h } = api; let dice, held, turnScore, total, rounds, banked;
+      const scoreDice = ds => { const c = Array(7).fill(0); ds.forEach(d => c[d]++); let s = 0; for (let v = 1; v <= 6; v++) { if (c[v] >= 3) { s += (v === 1 ? 1000 : v * 100) * (c[v] - 2); c[v] = 0; } } s += c[1] * 100 + c[5] * 50; return s; };
+      function start() { total = 0; rounds = 0; newRound(); }
+      function newRound() { dice = [1, 2, 3, 4, 5, 6].map(() => api.rand(1, 6)); held = [0, 0, 0, 0, 0, 0]; turnScore = 0; banked = []; rounds++; render(); checkFarkle(); }
+      function render() { screen.innerHTML = ''; api.header(screen, [{ label: 'Всего', value: total }, { label: 'Раунд', value: rounds + '/5' }, { label: 'За ход', value: turnScore + scoreDice(dice.filter((d, i) => held[i])) }]); screen.append(h('div', { class: 'game-area', style: 'gap:16px' }, h('div', { class: 'row' }, dice.map((d, i) => h('div', { class: 'die' + (held[i] ? ' held' : ''), onclick: () => { held[i] ^= 1; api.sound('tap'); render(); } }, '⚀⚁⚂⚃⚄⚅'[d - 1]))), banked.length ? h('div', { class: 'hint-text' }, 'Отложено: ' + banked.map(d => '⚀⚁⚂⚃⚄⚅'[d - 1]).join(' ')) : null, h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: roll }, '🎲 Отложить и бросить'), h('button', { class: 'btn gold', onclick: bank }, '💰 Записать')), h('div', { class: 'hint-text' }, '1 = 100, 5 = 50, три одинаковых = ×100 (три единицы = 1000)'))); }
+      function roll() { const sel = dice.filter((d, i) => held[i]); if (!sel.length || !scoreDice(sel)) { api.toast('Отложите очковые кубики'); return; } turnScore += scoreDice(sel); banked.push(...sel); dice = dice.filter((d, i) => !held[i]).map(() => api.rand(1, 6)); if (!dice.length) dice = [1, 2, 3, 4, 5, 6].map(() => api.rand(1, 6)); held = dice.map(() => 0); api.sound('select'); render(); checkFarkle(); }
+      function checkFarkle() { if (!scoreDice(dice)) { api.sound('bad'); api.toast('Фаркл! Очки хода сгорели'); turnScore = 0; setTimeout(next, 900); } }
+      function bank() { const sel = dice.filter((d, i) => held[i]); total += turnScore + scoreDice(sel); api.sound('good'); next(); }
+      function next() { if (rounds >= 5) { api.best('farkle', total); api.end({ title: 'Итог: ' + total, reward: Math.floor(total / 150), onAgain: start }); } else newRound(); }
+      start();
+    } });
+
+  /* ---------- Пьяница ---------- */
+  Games.register({ id: 'war', title: 'Пьяница', icon: '🍺', cat: 'board', desc: 'Карточная война: старшая карта забирает обе', bestLabel: 'Побед',
+    mount(screen, api) {
+      const { h } = api; let me, pc, a, b, over, st = stats(api, 'war'), pot;
+      function start() { const d = deck(api); me = d.slice(0, 26); pc = d.slice(26); a = null; b = null; over = false; pot = []; render(); }
+      function render() { screen.innerHTML = ''; api.header(screen, [{ label: 'Вы', value: me.length }, { label: 'ПК', value: pc.length }, { label: 'П · П', value: st.txt() }]); screen.append(h('div', { class: 'game-area', style: 'gap:20px' }, h('div', { class: 'row', style: 'gap:30px' }, a ? cardEl(h, a, { cls: 'big' }) : h('div', { class: 'card-face big' }, '🂠'), b ? cardEl(h, b, { cls: 'big' }) : h('div', { class: 'card-face big' }, '🂠')), h('button', { class: 'btn primary', style: 'font-size:20px;padding:16px 40px', disabled: over, onclick: play }, 'Открыть'))); }
+      function play() { if (!me.length || !pc.length) return; a = me.shift(); b = pc.shift(); pot.push(a, b); api.sound('tap'); render(); if (a.v > b.v) { me.push(...api.shuffle(pot)); pot = []; api.sound('good'); } else if (b.v > a.v) { pc.push(...api.shuffle(pot)); pot = []; api.sound('bad'); } else { api.toast('Спор! Следующая пара решает'); } render(); if (!me.length) { over = true; st.lose(); api.end({ win: false, title: 'Карты кончились', onAgain: start }); } else if (!pc.length) { over = true; st.win(); api.end({ title: 'Все карты ваши!', reward: 20, onAgain: start }); } }
+      start();
+    } });
+
+  /* ---------- Пасьянс Гольф ---------- */
+  Games.register({ id: 'golf', title: 'Пасьянс Гольф', icon: '⛳', cat: 'board', desc: 'Снимай карты на 1 выше или ниже верхней', bestLabel: 'Меньше осталось',
+    mount(screen, api) {
+      const { h } = api; let cols, stock, top;
+      function start() { const d = deck(api); cols = Array.from({ length: 7 }, (_, i) => d.slice(i * 5, i * 5 + 5)); stock = d.slice(35); top = stock.pop(); render(); }
+      const ok = c => Math.abs(c.v - top.v) === 1 || (c.v === 2 && top.v === 14) || (c.v === 14 && top.v === 2);
+      function render() { screen.innerHTML = ''; const left = cols.flat().length; api.header(screen, [{ label: 'Осталось', value: left }, { label: 'Колода', value: stock.length }, { label: 'Рекорд', value: api.bestOf('golf') != null ? api.bestOf('golf') : '—' }]); const tab = h('div', { style: 'display:grid;grid-template-columns:repeat(7,1fr);gap:4px;width:100%' }, cols.map((col, ci) => h('div', { style: 'display:flex;flex-direction:column' }, col.map((c, i) => cardEl(h, c, { style: 'width:100%;height:44px;font-size:15px;margin-top:' + (i ? '-18px' : '0'), onclick: () => { if (i === col.length - 1 && ok(c)) { col.pop(); top = c; api.sound('good'); render(); check(); } else api.sound('bad'); } }))))); screen.append(h('div', { class: 'game-area', style: 'justify-content:flex-start;gap:16px;overflow:auto' }, tab, h('div', { class: 'row', style: 'gap:20px' }, cardEl(h, top, { cls: 'big' }), h('div', { class: 'card-face big', style: 'font-size:18px', onclick: () => { if (!stock.length) { api.toast('Колода пуста'); return; } top = stock.pop(); api.sound('tap'); render(); check(); } }, stock.length ? '🂠 ' + stock.length : '—')))); }
+      function check() { const left = cols.flat().length; if (!left) { api.best('golf', 0, true); api.end({ title: 'Пасьянс сошёлся!', reward: 40, onAgain: start }); return; } const any = cols.some(c => c.length && ok(c[c.length - 1])); if (!any && !stock.length) { api.best('golf', left, true); api.end({ win: false, title: 'Ходов нет', reward: left <= 5 ? 10 : 0, text: 'Осталось карт: ' + left, onAgain: start }); } }
+      start();
+    } });
+
+  /* ---------- Пасьянс Пирамида ---------- */
+  Games.register({ id: 'pyramid', title: 'Пирамида', icon: '🔺', cat: 'board', desc: 'Убирай пары карт с суммой 13. Король — один', bestLabel: 'Побед',
+    mount(screen, api) {
+      const { h } = api; let pyr, stock, waste, sel = null, wins = api.load('pyr_w', 0);
+      const val = c => c.v === 14 ? 1 : Math.min(c.v, 13);
+      function start() { const d = deck(api); pyr = []; let k = 0; for (let r = 0; r < 7; r++) { pyr.push(d.slice(k, k + r + 1)); k += r + 1; } stock = d.slice(k); waste = []; sel = null; render(); }
+      const free = (r, i) => r === 6 || (!pyr[r + 1][i] && !pyr[r + 1][i + 1]);
+      function render() { screen.innerHTML = ''; api.header(screen, [{ label: 'Побед', value: wins }, { label: 'Колода', value: stock.length }, { btn: '↻', onClick: start }]); const tri = h('div', { style: 'display:flex;flex-direction:column;align-items:center' }); pyr.forEach((row, r) => tri.append(h('div', { style: 'display:flex;gap:2px;margin-top:' + (r ? '-16px' : '0') }, row.map((c, i) => c ? cardEl(h, c, { style: 'width:42px;height:56px;font-size:14px;' + (free(r, i) ? '' : 'opacity:.55;') + (sel && sel.c === c ? 'outline:3px solid var(--accent2)' : ''), onclick: () => tap({ c, r, i }) }) : h('div', { style: 'width:42px;height:56px' }))))); const w = waste[waste.length - 1]; screen.append(h('div', { class: 'game-area', style: 'justify-content:flex-start;gap:10px;overflow:auto' }, tri, h('div', { class: 'row', style: 'gap:20px' }, h('div', { class: 'card-face', onclick: draw }, stock.length ? '🂠' : '↻'), w ? cardEl(h, w, { style: sel && sel.c === w ? 'outline:3px solid var(--accent2)' : '', onclick: () => tap({ c: w, w: true }) }) : h('div', { class: 'card-face' }, '')), h('div', { class: 'hint-text' }, 'Пара с суммой 13: A=1, J=11, Q=12, K=13 (убирается один)'))); }
+      function remove(s) { if (s.w) waste.pop(); else pyr[s.r][s.i] = null; }
+      function tap(s) { if (!s.w && !free(s.r, s.i)) return; if (val(s.c) === 13) { remove(s); sel = null; api.sound('good'); render(); check(); return; } if (!sel) { sel = s; api.sound('tap'); render(); return; } if (sel.c === s.c) { sel = null; render(); return; } if (val(sel.c) + val(s.c) === 13) { remove(sel); remove(s); sel = null; api.sound('good'); api.vibrate(8); render(); check(); } else { sel = s; api.sound('bad'); render(); } }
+      function draw() { if (stock.length) { waste.push(stock.pop()); } else { stock = waste.reverse(); waste = []; } sel = null; api.sound('tap'); render(); }
+      function check() { if (pyr.every(r => r.every(c => !c))) { wins++; api.store('pyr_w', wins); api.best('pyramid', wins); api.end({ title: 'Пирамида разобрана!', reward: 40, onAgain: start }); } }
+      start();
+    } });
+
+  /* ---------- Видеопокер ---------- */
+  Games.register({ id: 'videopoker', title: 'Видеопокер', icon: '🃏', cat: 'board', desc: 'Ставка 10: оставь карты, обменяй остальные, собери комбинацию', bestLabel: 'Лучший выигрыш',
+    mount(screen, api) {
+      const { h } = api; let d, hand, held, stage;
+      const PAY = [['Роял-флеш', 250], ['Стрит-флеш', 50], ['Каре', 25], ['Фулл-хаус', 9], ['Флеш', 6], ['Стрит', 4], ['Тройка', 3], ['Две пары', 2], ['Пара (J+)', 1]];
+      function evalHand(hd) { const vs = hd.map(c => c.v).sort((a, b) => a - b); const cnt = {}; vs.forEach(v => cnt[v] = (cnt[v] || 0) + 1); const groups = Object.values(cnt).sort((a, b) => b - a); const flush = hd.every(c => c.s === hd[0].s); const straight = new Set(vs).size === 5 && (vs[4] - vs[0] === 4 || vs.join() === '2,3,4,5,14'); if (flush && straight && vs[0] === 10) return 0; if (flush && straight) return 1; if (groups[0] === 4) return 2; if (groups[0] === 3 && groups[1] === 2) return 3; if (flush) return 4; if (straight) return 5; if (groups[0] === 3) return 6; if (groups[0] === 2 && groups[1] === 2) return 7; if (groups[0] === 2 && Object.keys(cnt).some(v => cnt[v] === 2 && +v >= 11)) return 8; return -1; }
+      function start() { if (!api.spend(10)) { api.toast('Нужно 10 монет'); api.exit(); return; } d = deck(api); hand = d.splice(0, 5); held = [0, 0, 0, 0, 0]; stage = 0; render(); }
+      function render() { screen.innerHTML = ''; api.header(screen, [{ label: 'Монеты', value: api.coins }, { label: 'Ставка', value: 10 }]); screen.append(h('div', { class: 'game-area', style: 'justify-content:flex-start;gap:12px;overflow:auto' }, h('div', { class: 'row', style: 'flex-wrap:nowrap' }, hand.map((c, i) => cardEl(h, c, { style: 'width:58px;' + (held[i] ? 'outline:3px solid var(--accent2)' : ''), onclick: () => { if (stage) return; held[i] ^= 1; api.sound('tap'); render(); } }))), h('div', { class: 'hint-text' }, stage ? '' : 'Нажми карты, которые оставить'), h('button', { class: 'btn primary', style: 'font-size:18px', onclick: stage ? start : drawCards }, stage ? 'Новая раздача (10)' : 'Обменять'), h('div', { style: 'display:grid;grid-template-columns:1fr auto;gap:4px 16px;font-size:13px;width:100%;max-width:300px' }, PAY.flatMap(([n, m], k) => [h('span', { style: evalHand(hand) === k ? 'color:var(--gold);font-weight:800' : '' }, n), h('b', null, '×' + m)])))); }
+      function drawCards() { hand = hand.map((c, i) => held[i] ? c : d.pop()); stage = 1; const k = evalHand(hand); render(); if (k >= 0) { const win = PAY[k][1] * 10; api.best('videopoker', win); api.end({ title: PAY[k][0] + '!', reward: win, again: 'Ещё', onAgain: start }); } else { api.sound('bad'); api.toast('Ничего не собралось'); } }
+      start();
+    } });
+
+  /* ---------- Восьмёрки ---------- */
+  Games.register({ id: 'crazy8', title: 'Восьмёрки', icon: '8️⃣', cat: 'board', desc: 'Клади карту той же масти или ранга. Восьмёрка меняет масть', bestLabel: 'Побед',
+    mount(screen, api) {
+      const { h } = api; let d, me, pc, top, suit, over, st = stats(api, 'crazy8');
+      function start() { d = deck(api); me = d.splice(0, 7); pc = d.splice(0, 7); top = d.pop(); suit = top.s; over = false; render(); }
+      const can = c => c.r === '8' || c.s === suit || c.r === top.r;
+      function render() { screen.innerHTML = ''; api.header(screen, [{ label: 'У ПК', value: pc.length }, { label: 'Масть', value: suit }, { label: 'П · П', value: st.txt() }]); screen.append(h('div', { class: 'game-area', style: 'justify-content:flex-start;gap:14px;overflow:auto' }, h('div', { class: 'row' }, cardEl(h, top, { cls: 'big' }), h('div', { class: 'card-face big', style: 'font-size:16px', onclick: drawCard }, '🂠 ' + d.length)), h('div', { class: 'hint-text' }, 'Ваши карты:'), h('div', { class: 'row' }, me.map(c => cardEl(h, c, { style: 'width:52px;height:72px;font-size:18px;' + (can(c) ? 'outline:2px solid var(--green)' : 'opacity:.6'), onclick: () => play(c) }))))); }
+      function play(c) { if (over || !can(c)) { api.sound('bad'); return; } me.splice(me.indexOf(c), 1); top = c; api.sound('tap'); if (c.r === '8') { const body = h('div', { class: 'row' }, SUITS.map(s => h('button', { class: 'btn', style: 'font-size:28px', onclick: () => { suit = s; m.close(); after(); } }, s))); const m = api.modal({ title: 'Выберите масть', body, buttons: [] }); } else { suit = c.s; after(); } }
+      function after() { render(); if (!me.length) { over = true; st.win(); api.end({ title: 'Победа!', reward: 25, onAgain: start }); return; } setTimeout(ai, 500); }
+      function drawCard() { if (over) return; if (!d.length) { api.toast('Колода пуста — ход пропущен'); setTimeout(ai, 300); return; } me.push(d.pop()); api.sound('tap'); render(); if (!me.some(can)) setTimeout(ai, 300); }
+      function ai() { let c = pc.find(x => x.r !== '8' && can(x)) || pc.find(can); if (!c) { if (d.length) pc.push(d.pop()); c = pc.find(can); if (!c) { render(); return; } } pc.splice(pc.indexOf(c), 1); top = c; if (c.r === '8') { const cnt = {}; pc.forEach(x => cnt[x.s] = (cnt[x.s] || 0) + 1); suit = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || SUITS[api.rand(0, 3)]; } else suit = c.s; api.sound('select'); render(); if (!pc.length) { over = true; st.lose(); api.end({ win: false, title: 'Компьютер выиграл', onAgain: start }); } }
+      start();
+    } });
+
+  /* ---------- Домино ---------- */
+  Games.register({ id: 'domino', title: 'Домино', icon: '🁫', cat: 'board', desc: 'Приставляй кости к концам цепочки', bestLabel: 'Побед',
+    mount(screen, api) {
+      const { h } = api; let me, pc, boneyard, chain, over, st = stats(api, 'domino'), passes;
+      const ends = () => chain.length ? [chain[0][0], chain[chain.length - 1][1]] : null;
+      function start() { const all = []; for (let a = 0; a <= 6; a++) for (let b = a; b <= 6; b++) all.push([a, b]); api.shuffle(all); me = all.splice(0, 7); pc = all.splice(0, 7); boneyard = all; chain = []; over = false; passes = 0; render(); }
+      const fits = t => { const e = ends(); return !e || t.includes(e[0]) || t.includes(e[1]); };
+      const tile = (t, click, cls) => h('div', { class: 'dom ' + (cls || ''), onclick: click }, h('span', null, '⚀⚁⚂⚃⚄⚅'[t[0] - 1] || '·'), h('span', null, '⚀⚁⚂⚃⚄⚅'[t[1] - 1] || '·'));
+      function render() { screen.innerHTML = ''; api.header(screen, [{ label: 'У ПК', value: pc.length }, { label: 'Базар', value: boneyard.length }, { label: 'П · П', value: st.txt() }]); screen.append(h('div', { class: 'game-area', style: 'justify-content:flex-start;gap:12px;overflow:auto' }, h('div', { style: 'display:flex;flex-wrap:wrap;gap:3px;justify-content:center;max-width:100%' }, chain.map(t => tile(t, null, 'small'))), h('div', { class: 'hint-text' }, 'Ваши кости (нажми, чтобы поставить)'), h('div', { class: 'row' }, me.map(t => tile(t, () => play(t), fits(t) ? 'ok' : ''))), h('button', { class: 'btn', onclick: draw }, boneyard.length ? 'Взять с базара' : 'Пропустить ход'))); }
+      function place(t, who) { const e = ends(); if (!e) { chain.push(t); return true; } if (t[0] === e[1]) chain.push(t); else if (t[1] === e[1]) chain.push([t[1], t[0]]); else if (t[1] === e[0]) chain.unshift(t); else if (t[0] === e[0]) chain.unshift([t[1], t[0]]); else return false; return true; }
+      function play(t) { if (over || !fits(t)) { api.sound('bad'); return; } place(t); me.splice(me.indexOf(t), 1); api.sound('tap'); passes = 0; render(); if (!me.length) { over = true; st.win(); api.end({ title: 'Победа!', reward: 25, onAgain: start }); return; } setTimeout(ai, 500); }
+      function draw() { if (over) return; if (me.some(fits)) { api.toast('У вас есть подходящая кость'); return; } if (boneyard.length) { me.push(boneyard.pop()); api.sound('tap'); render(); if (!me.some(fits) && !boneyard.length) { passes++; setTimeout(ai, 300); } } else { passes++; setTimeout(ai, 300); } }
+      function ai() { let t = pc.filter(fits).sort((a, b) => (b[0] + b[1]) - (a[0] + a[1]))[0]; while (!t && boneyard.length) { pc.push(boneyard.pop()); t = pc.find(fits); } if (t) { place(t); pc.splice(pc.indexOf(t), 1); passes = 0; api.sound('select'); } else passes++; render(); if (!pc.length) { over = true; st.lose(); api.end({ win: false, title: 'Компьютер выложил всё', onAgain: start }); return; } if (passes >= 2) { over = true; const m = me.reduce((s, x) => s + x[0] + x[1], 0), p = pc.reduce((s, x) => s + x[0] + x[1], 0); if (m < p) { st.win(); api.end({ title: 'Рыба! У вас меньше очков', reward: 15, onAgain: start }); } else { st.lose(); api.end({ win: false, title: 'Рыба! У ПК меньше очков', onAgain: start }); } } }
+      start();
+    } });
+})();

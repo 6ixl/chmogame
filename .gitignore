@@ -1,0 +1,12 @@
+node_modules/
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/chmogame.keystore
+android/keystore.properties
+tools/data/
+tools/shots/
+tools/ghauth.log
+tools/setup.log
+*.apk

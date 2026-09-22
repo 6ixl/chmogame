@@ -1,0 +1,20 @@
+{
+  "name": "chmogame",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Чмогейм — офлайн-сборник мини-игр",
+  "scripts": {
+    "serve": "npx serve www -l 5173",
+    "sync": "npx cap sync android",
+    "apk": "cd android && gradlew.bat assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.6.9",
+    "@capacitor/cli": "^7.6.9",
+    "@capacitor/core": "^7.6.9"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0",
+    "serve": "^14.2.6"
+  }
+}
