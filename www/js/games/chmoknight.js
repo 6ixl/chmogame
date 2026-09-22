@@ -118,8 +118,19 @@ Games.register({
     function levelPick() { const box = h('div', { class: 'levels', style: 'max-height:50vh;overflow:auto' }); for (let i = 1; i <= Math.max(maxFloor, 1); i++) box.append(h('div', { class: 'lvl ' + (i < maxFloor ? 'done' : 'cur'), onclick: () => { m.close(); clearSave(); newRun(i); } }, i)); const m = api.modal({ title: 'Выбор этажа', text: 'Старт с этажа даёт снаряжение под его уровень', body: box, buttons: [{ label: 'Назад', onClick: menu }] }); }
 
     /* ---------- цикл ---------- */
+    /* если герой оказался внутри стены — выталкиваем на ближайшую свободную клетку */
+    function unstuck() {
+      if (!solid(p.x, p.y)) return;
+      for (let r = 1; r <= 8; r++) for (let k = 0; k < 16; k++) {
+        const an = k * Math.PI / 8; const nx = p.x + Math.cos(an) * r * T * 0.6, ny = p.y + Math.sin(an) * r * T * 0.6;
+        if (!solid(nx, ny) && !solid(nx - 10, ny) && !solid(nx + 10, ny) && !solid(nx, ny - 10) && !solid(nx, ny + 10)) { p.x = nx; p.y = ny; return; }
+      }
+      const r0 = roomAt(p.x, p.y) || rooms[(G >> 1) * G + (G >> 1)]; p.x = (r0.x + RW / 2) * T; p.y = (r0.y + RH / 2) * T;
+    }
     function update(dt) {
-      if (!alive || paused) return;
+      if (paused) { joy = null; fire = null; return; }
+      if (!alive) return;
+      unstuck();
       p.cd -= dt; p.hurt -= dt; p.armorT -= dt; if (p.armorT <= 0 && p.armor < 6) p.armor = Math.min(6, p.armor + dt * 0.8); p.en = Math.min(buffs.maxen, p.en + dt * 10 * buffs.regen);
       saveT += dt; if (saveT > 5) { saveT = 0; saveRun(); }
       if (joy) { const dx = joy.dx, dy = joy.dy; const d = Math.hypot(dx, dy); if (d > 6) { const sp = 170 * buffs.spd * Math.min(1, d / 50); moveEnt(p, dx / d * sp * dt, dy / d * sp * dt); if (!nearestEnemy()) p.a = Math.atan2(dy, dx); } }
@@ -180,12 +191,12 @@ Games.register({
     const a = api.arcade(screen, { w: W, h: H, stats: [{ label: 'Этаж', value: 1 }, { label: '●', value: 0 }, { btn: '☰', onClick: () => { saveRun(); menu(); } }], hint: 'Левая половина — джойстик · ОГОНЬ — стрельба с автоприцелом · 🔄 — сменить оружие',
       onDown: (pt, e) => { if (!alive || paused) return; if (Math.hypot(pt.x - (W - 60), pt.y - (H - 150)) < 30 && p.weapons.length > 1) { p.wi = (p.wi + 1) % p.weapons.length; api.sound('tap'); return; } if (pt.x > W / 2 && pt.y > H / 2) { fire = { id: e.pointerId }; return; } joy = { id: e.pointerId, x: pt.x, y: pt.y, dx: 0, dy: 0 }; },
       onMove: (pt, e) => { if (joy && e.pointerId === joy.id) { joy.dx = pt.x - joy.x; joy.dy = pt.y - joy.y; } },
-      onUp: (pt, e) => { if (joy && e.pointerId === joy.id) joy = null; if (fire && e.pointerId === fire.id) fire = null; },
+      onUp: (pt, e) => { if (!e || e.blur) { joy = null; fire = null; return; } if (joy && (joy.id === e.pointerId || joy.kb)) joy = null; if (fire && (fire.id === e.pointerId || fire.kb)) fire = null; },
       onKey: e => { keys[e.key] = true; if (e.key === 'q' && p) p.wi = (p.wi + 1) % p.weapons.length; },
       frame(dt, ctx) { if (!map) return; if (keys.ArrowLeft || keys.ArrowRight || keys.ArrowUp || keys.ArrowDown) joy = { x: 0, y: 0, dx: (keys.ArrowRight ? 50 : 0) - (keys.ArrowLeft ? 50 : 0), dy: (keys.ArrowDown ? 50 : 0) - (keys.ArrowUp ? 50 : 0), kb: true }; else if (joy && joy.kb) joy = null; if (keys[' ']) fire = fire || { kb: true }; else if (fire && fire.kb) fire = null; update(dt); draw(ctx); } });
     window.addEventListener('keyup', a._ku = e => { keys[e.key] = false; }); hdr = a.hdr;
     this.unmount = () => { if (alive) saveRun(); a.stop(); window.removeEventListener('keyup', a._ku); };
-    window.__tp = i => { p.x = (rooms[i].x + RW / 2) * T; p.y = (rooms[i].y + RH / 2) * T; }; window.__ck = () => ({ b: bullets.length, en: enemies.length, room: rooms.indexOf(roomAt(p.x, p.y)), links: rooms[(G >> 1) * G + (G >> 1)].links, floor, alive });
+    window.__stuck = () => { const r = roomAt(p.x, p.y) || rooms[0]; p.x = (r.x + 0.5) * T; p.y = (r.y + 0.5) * T; }; window.__tp = i => { p.x = (rooms[i].x + RW / 2) * T; p.y = (rooms[i].y + RH / 2) * T; }; window.__ck = () => ({ b: bullets.length, en: enemies.length, room: rooms.indexOf(roomAt(p.x, p.y)), links: rooms[(G >> 1) * G + (G >> 1)].links, floor, alive });
     if (api.load('ck_save', null)) menu(); else newRun(1);
   }
 });

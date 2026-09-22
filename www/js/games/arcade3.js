@@ -147,26 +147,6 @@
     }
   });
 
-  /* ---------- Кликер ---------- */
-  Games.register({
-    id: 'clicker', title: 'Монетный кликер', icon: '💰', cat: 'arcade', desc: 'Тапай по монете, покупай улучшения', bestLabel: 'Всего',
-    mount(screen, api) {
-      const { h } = api; let st = api.load('clicker', { total: 0, perTap: 1, auto: 0, bank: 0 }); let timer, bankEl, coinEl;
-      const UPS = [['👆 +1 за тап', () => 30 * st.perTap, () => st.perTap++], ['🤖 Автоклик +1/с', () => 50 + st.auto * 40, () => st.auto++]];
-      function render() {
-        screen.innerHTML = ''; const hdr = api.header(screen, [{ label: 'За тап', value: st.perTap }, { label: 'В сек.', value: st.auto }, { label: 'Всего', value: st.total }]);
-        bankEl = h('div', { style: 'font-size:32px;font-weight:800;color:var(--gold)' }, st.bank + ' ●');
-        coinEl = h('div', { style: 'font-size:120px;line-height:1;transition:transform .08s;cursor:pointer', onpointerdown: () => { st.bank += st.perTap; st.total += st.perTap; coinEl.style.transform = 'scale(.9)'; setTimeout(() => coinEl.style.transform = '', 80); api.vibrate(4); upd(); hdr.set(2, st.total); } }, '🪙');
-        const ups = h('div', { style: 'display:flex;flex-direction:column;gap:8px;width:100%;max-width:340px' }, UPS.map(([n, cost, act]) => h('button', { class: 'btn', style: 'justify-content:space-between', onclick: () => { if (st.bank >= cost()) { st.bank -= cost(); act(); api.sound('good'); render(); } else api.sound('bad'); } }, n, h('b', null, cost() + ' ●'))));
-        screen.append(h('div', { class: 'game-area', style: 'gap:16px' }, bankEl, coinEl, ups, h('button', { class: 'btn gold', onclick: () => { if (st.bank < 100) { api.toast('Минимум 100 в банке'); return; } const n = Math.floor(st.bank / 100) * 10; st.bank -= n * 10; api.addCoins(n); api.best('clicker', st.total); upd(); } }, 'Обменять 100 → 10 монет'), h('div', { class: 'hint-text' }, 'Банк копится, пока вы играете в кликер')));
-      }
-      function upd() { bankEl.textContent = st.bank + ' ●'; api.store('clicker', st); }
-      timer = setInterval(() => { if (st.auto) { st.bank += st.auto; st.total += st.auto; upd(); } }, 1000);
-      this.unmount = () => clearInterval(timer);
-      render();
-    }
-  });
-
   /* ---------- Цвета (Струп) ---------- */
   Games.register({
     id: 'stroop', title: 'Цвет слова', icon: '🌈', cat: 'brain', desc: 'Выбери цвет, которым написано слово, а не само слово', bestLabel: 'Рекорд',

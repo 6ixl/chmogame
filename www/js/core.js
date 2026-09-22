@@ -138,13 +138,20 @@
       const cv = h2canvas(area, o.w, o.h); const ctx = cv.ctx;
       let raf, last = 0, running = true;
       const loop = t => { if (!running) return; raf = requestAnimationFrame(loop); const dt = Math.min(0.05, (t - (last || t)) / 1000); last = t; o.frame(dt, ctx); };
-      const pos = e => { const r = cv.canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * o.w / r.width, y: (e.clientY - r.top) * o.h / r.height }; };
-      if (o.onDown) cv.canvas.addEventListener('pointerdown', e => o.onDown(pos(e), e));
+      let winUp = null, blurUp = null;
+      const pos = e => { const r = cv.canvas.getBoundingClientRect(); return { x: ((e.clientX || 0) - r.left) * o.w / r.width, y: ((e.clientY || 0) - r.top) * o.h / r.height }; };
+      if (o.onDown) cv.canvas.addEventListener('pointerdown', e => { try { cv.canvas.setPointerCapture(e.pointerId); } catch (err) {} o.onDown(pos(e), e); });
       if (o.onMove) cv.canvas.addEventListener('pointermove', e => o.onMove(pos(e), e));
-      if (o.onUp) { cv.canvas.addEventListener('pointerup', e => o.onUp(pos(e), e)); cv.canvas.addEventListener('pointercancel', e => o.onUp(pos(e), e)); }
+      if (o.onUp) {
+        const up = e => o.onUp(pos(e), e);
+        cv.canvas.addEventListener('pointerup', up); cv.canvas.addEventListener('pointercancel', up); cv.canvas.addEventListener('lostpointercapture', up);
+        /* палец мог уйти за пределы холста — ловим отпускание на уровне окна, иначе управление «залипает» */
+        winUp = e => o.onUp(pos(e), e); window.addEventListener('pointerup', winUp); window.addEventListener('pointercancel', winUp);
+        blurUp = () => o.onUp({ x: -1, y: -1 }, { pointerId: -1, blur: true }); window.addEventListener('blur', blurUp);
+      }
       if (o.onKey) window.addEventListener('keydown', o.onKey);
       raf = requestAnimationFrame(loop);
-      return { hdr, cv, ctx, pos, stop: () => { running = false; cancelAnimationFrame(raf); cv.destroy(); if (o.onKey) window.removeEventListener('keydown', o.onKey); } };
+      return { hdr, cv, ctx, pos, stop: () => { running = false; cancelAnimationFrame(raf); cv.destroy(); if (o.onKey) window.removeEventListener('keydown', o.onKey); if (winUp) { window.removeEventListener('pointerup', winUp); window.removeEventListener('pointercancel', winUp); } if (blurUp) window.removeEventListener('blur', blurUp); } };
     },
     /* выбор сложности бота при запуске: cb(0|1|2). Запоминает последний выбор */
     difficulty: (id, cb) => {
