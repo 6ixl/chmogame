@@ -15,7 +15,14 @@
       function spin() {
         if (spinning || !api.spend(bet)) return; a.hdr.set(0, api.coins); lastWin = 0; confetti = []; cross = 0;
         spinning = true; api.sound('tap'); api.vibrate(8);
-        reels.forEach((r, i) => { r.spinning = true; r.vel = 26 + Math.random() * 6; r.stopAt = -1; r.res = api.rand(0, N - 1); setTimeout(() => { r.stopAt = r.res; }, 900 + i * 550); });
+        reels.forEach((r, i) => {
+          r.spinning = true; r.res = api.rand(0, N - 1);
+          r.t = 0; r.dur = 1.3 + i * 0.7;                       // барабаны останавливаются по очереди: 1 → 2 → 3
+          r.from = r.pos;
+          const turns = 6 + i * 2;                              // сколько полных оборотов прокрутится
+          let cur = ((r.pos % N) + N) % N;
+          r.to = r.pos + (N - cur) + turns * N + r.res;         // ровно на нужном символе
+        });
       }
       function finishSpin() {
         spinning = false; const [x, y, z] = reels.map(r => r.res);
@@ -29,18 +36,15 @@
       const a = api.arcade(screen, { w: W, h: H, stats: [{ label: 'Монеты', value: api.coins }, { label: 'Рекорд', value: api.bestOf('slots') || 0 }], hint: 'Три одинаковых — джекпот, два — ×2',
         onDown: p => { if (p.y > 350 && p.y < 420) spin(); },
         frame(dt, ctx) {
-          // физика барабанов
+          // физика барабанов: плавное торможение до заданного символа
           let allStopped = true;
           reels.forEach(r => {
             if (!r.spinning) return; allStopped = false;
-            if (r.stopAt < 0) { r.pos += r.vel * dt; }
-            else { // тормозим до нужного символа с лёгким отскоком
-              const target = r.stopAt; let cur = r.pos % N; if (cur < 0) cur += N;
-              let diff = (target - cur + N) % N; const dist = diff + (r.vel > 6 ? N : 0);
-              r.vel = Math.max(2.2, Math.min(r.vel, dist * 3.2 + 1.4)); r.pos += r.vel * dt;
-              cur = r.pos % N; if (cur < 0) cur += N; diff = (target - cur + N) % N;
-              if (r.vel <= 3 && diff < 0.06) { r.pos = target; r.vel = 0; r.spinning = false; r.bounce = 0.18; api.sound('select'); api.vibrate(12); }
-            }
+            r.t += dt;
+            const k = Math.min(1, r.t / r.dur);
+            const ease = 1 - Math.pow(1 - k, 3);                 // быстро в начале, мягко в конце
+            r.pos = r.from + (r.to - r.from) * ease;
+            if (k >= 1) { r.pos = r.to; r.spinning = false; r.bounce = 0.18; api.sound('select'); api.vibrate(12); }
           });
           reels.forEach(r => { if (r.bounce > 0) r.bounce -= dt; });
           if (spinning && allStopped) finishSpin();
@@ -89,6 +93,7 @@
       betsEl = h('div', { class: 'bottom-bar' });
       function renderBets() { betsEl.innerHTML = ''; betsEl.append(h('div', { class: 'row' }, h('span', { class: 'hint-text' }, 'Ставка:'), [5, 10, 25, 50, 100].map(v => h('button', { class: 'btn small ' + (bet === v ? 'gold' : ''), onclick: () => { bet = v; renderBets(); api.sound('tap'); } }, v)))); }
       renderBets(); screen.append(betsEl);
+      window.__slots = () => ({ spinning, reels: reels.map(r => (r.spinning ? 'крутится' : 'стоп:' + SYM[r.res])), win: lastWin });
       this.unmount = a.stop;
     } });
 

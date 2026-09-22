@@ -39,7 +39,7 @@ window.renderHub = function (screen, api, games) {
           h('div', { class: 'ico' }, g.icon),
           h('div', { class: 'name' }, g.title),
           h('div', { class: 'desc' }, g.desc),
-          h('div', { class: 'best' }, b != null ? (g.bestLabel || 'Рекорд') + ': ' + b : (g.progress ? g.progress(api) : ''))));
+          h('div', { class: 'best' }, g.id === 'clicker' && window.ClickerCore ? '⚡ ' + window.ClickerCore.fmt(window.ClickerCore.cps(window.ClickerCore.S)) + '/с в фоне' : b != null ? (g.bestLabel || 'Рекорд') + ': ' + b : (g.progress ? g.progress(api) : ''))));
         shown++;
       }
       list.append(grid);
