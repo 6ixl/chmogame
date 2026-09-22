@@ -139,35 +139,46 @@
 
   /* ---------- Три в ряд ---------- */
   Games.register({
-    id: 'match3', title: 'Три в ряд', icon: '💎', cat: 'puzzle', desc: 'Меняй соседние камни, собирай ряды из 3+', bestLabel: 'Рекорд',
+    id: 'match3', title: 'Три в ряд', icon: '💎', cat: 'puzzle', desc: 'Свайпни камень к соседнему, собери ряд из 3+', bestLabel: 'Рекорд',
     mount(screen, api) {
-      const { h } = api; const N = 8, GEMS = ['🔴', '🟢', '🔵', '🟡', '🟣', '🟠']; let g, cells, score, moves, hdr, sel = -1, busy = false;
-      function start() { do { g = Array.from({ length: N * N }, () => api.rand(0, 5)); } while (matches().size); score = 0; moves = 30; render(); }
-      function matches() { const m = new Set(); for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { const i = r * N + c; if (c < N - 2 && g[i] === g[i + 1] && g[i] === g[i + 2] && g[i] >= 0) { m.add(i); m.add(i + 1); m.add(i + 2); } if (r < N - 2 && g[i] === g[i + N] && g[i] === g[i + 2 * N] && g[i] >= 0) { m.add(i); m.add(i + N); m.add(i + 2 * N); } } return m; }
-      function render() {
-        screen.innerHTML = ''; hdr = api.header(screen, [{ label: 'Счёт', value: score }, { label: 'Ходов', value: moves }, { label: 'Рекорд', value: api.bestOf('match3') || 0 }]);
-        const size = cellSize(screen, N, 400); const el = gridEl(h, N, size); cells = [];
-        for (let i = 0; i < N * N; i++) { const c = h('div', { class: 'pz-cell', style: 'font-size:' + Math.round(size * .6) + 'px;background:transparent', onclick: () => tap(i) }); cells.push(c); el.append(c); }
-        api.swipe(el, (d, e) => { if (d === 'tap') return; const t = document.elementFromPoint(e.clientX, e.clientY); });
-        screen.append(h('div', { class: 'game-area' }, el)); paint();
-      }
-      function paint() { cells.forEach((c, i) => { c.textContent = g[i] >= 0 ? GEMS[g[i]] : ''; c.classList.toggle('on', i === sel); }); }
-      async function tap(i) {
-        if (busy) return;
-        if (sel < 0) { sel = i; paint(); api.sound('tap'); return; }
-        const adj = Math.abs(sel - i) === N || (Math.abs(sel - i) === 1 && Math.floor(sel / N) === Math.floor(i / N));
-        if (!adj) { sel = i; paint(); return; }
-        [g[sel], g[i]] = [g[i], g[sel]]; const a = sel; sel = -1; paint();
-        if (!matches().size) { await sleep(150); [g[a], g[i]] = [g[i], g[a]]; paint(); api.sound('bad'); return; }
-        moves--; hdr.set(1, moves); busy = true; let combo = 0;
-        while (true) { const m = matches(); if (!m.size) break; combo++; score += m.size * 10 * combo; hdr.set(0, score); api.sound('good'); api.vibrate(10); m.forEach(k => cells[k].style.opacity = .2); await sleep(200); m.forEach(k => g[k] = -1); m.forEach(k => cells[k].style.opacity = 1);
-          for (let c = 0; c < N; c++) { const col = []; for (let r = N - 1; r >= 0; r--) if (g[r * N + c] >= 0) col.push(g[r * N + c]); for (let r = N - 1; r >= 0; r--) g[r * N + c] = col[N - 1 - r] != null ? col[N - 1 - r] : api.rand(0, 5); }
-          paint(); await sleep(150); }
-        if (combo >= 2) api.addCoins(combo); busy = false;
-        if (moves <= 0) { api.best('match3', score); api.end({ title: 'Ходы закончились', reward: Math.floor(score / 100), text: 'Счёт: ' + score, onAgain: start }); }
+      const N = 8, S = 44, W = N * S, H = N * S; let g, score, moves, sel = -1, busy = false, anim = [], t = 0, hint = null, hintT = 0;
+      const GEMS = [['#ef4444', '#fca5a5', 'circle'], ['#3b82f6', '#93c5fd', 'diamond'], ['#22c55e', '#86efac', 'square'], ['#f59e0b', '#fde68a', 'triangle'], ['#a855f7', '#d8b4fe', 'hex'], ['#06b6d4', '#a5f3fc', 'star']];
+      const matches = () => { const m = new Set(); for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { const i = r * N + c; if (g[i] < 0) continue; if (c < N - 2 && g[i] === g[i + 1] && g[i] === g[i + 2]) { m.add(i); m.add(i + 1); m.add(i + 2); } if (r < N - 2 && g[i] === g[i + N] && g[i] === g[i + 2 * N]) { m.add(i); m.add(i + N); m.add(i + 2 * N); } } return m; };
+      const adj = (a, b) => Math.abs(a - b) === N || (Math.abs(a - b) === 1 && Math.floor(a / N) === Math.floor(b / N));
+      function findHint() { for (let i = 0; i < N * N; i++) for (const j of [i + 1, i + N]) { if (j >= N * N || !adj(i, j)) continue; [g[i], g[j]] = [g[j], g[i]]; const ok = matches().size; [g[i], g[j]] = [g[j], g[i]]; if (ok) return [i, j]; } return null; }
+      function start() { do { g = Array.from({ length: N * N }, () => api.rand(0, 5)); } while (matches().size || !findHint()); score = 0; moves = 30; sel = -1; anim = []; a.hdr.set(0, 0); a.hdr.set(1, 30); hintT = 0; }
+      const a = api.arcade(screen, { w: W, h: H, stats: [{ label: 'Счёт', value: 0 }, { label: 'Ходов', value: 30 }, { label: 'Рекорд', value: api.bestOf('match3') || 0 }], hint: 'Свайп или два тапа — поменять соседние камни',
+        onDown: p => { if (busy) return; const i = Math.floor(p.y / S) * N + Math.floor(p.x / S); if (i < 0 || i >= N * N) return; if (sel >= 0 && adj(sel, i)) { trySwap(sel, i); sel = -1; return; } sel = i; a._down = { i, x: p.x, y: p.y }; api.sound('tap'); },
+        onMove: (p, e) => { if (busy || !a._down || !(e.buttons || e.pointerType === 'touch')) return; const dx = p.x - a._down.x, dy = p.y - a._down.y; if (Math.max(Math.abs(dx), Math.abs(dy)) < 18) return; const i = a._down.i; const j = Math.abs(dx) > Math.abs(dy) ? i + Math.sign(dx) : i + Math.sign(dy) * N; a._down = null; if (j >= 0 && j < N * N && adj(i, j)) { trySwap(i, j); sel = -1; } },
+        onUp: () => { a._down = null; },
+        frame(dt, ctx) {
+          t += dt; hintT += dt; anim.forEach(x => x.t += dt); anim = anim.filter(x => x.t < x.d);
+          ctx.fillStyle = '#12122a'; ctx.fillRect(0, 0, W, H);
+          for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { ctx.fillStyle = (r + c) % 2 ? '#1a1a38' : '#202044'; ctx.fillRect(c * S, r * S, S, S); }
+          const h2 = hintT > 4 && !busy ? (hint = hint || findHint()) : null;
+          for (let i = 0; i < N * N; i++) { if (g[i] < 0) continue; const an = anim.find(x => x.i === i); let x = (i % N) * S + S / 2, y = Math.floor(i / N) * S + S / 2, sc = 1, al = 1; if (an) { const k = an.t / an.d; if (an.k === 'fall') y -= an.from * S * (1 - k); if (an.k === 'swap') { x += an.dx * S * (1 - k); y += an.dy * S * (1 - k); } if (an.k === 'pop') { sc = 1 + k * 0.5; al = 1 - k; } } if (i === sel) { ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect((i % N) * S, Math.floor(i / N) * S, S, S); sc = 1.12; } if (h2 && h2.includes(i)) sc = 1 + Math.sin(t * 8) * 0.08; drawGem(ctx, g[i], x, y, sc, al); }
+          if (sel >= 0) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.strokeRect((sel % N) * S + 2, Math.floor(sel / N) * S + 2, S - 4, S - 4); }
+        } });
+      function drawGem(ctx, k, x, y, sc, al) {
+        const [c1, c2, shape] = GEMS[k]; const r = 16 * sc; ctx.save(); ctx.globalAlpha = al; ctx.translate(x, y);
+        ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 3; const grad = ctx.createRadialGradient(-r * .3, -r * .3, r * .1, 0, 0, r * 1.2); grad.addColorStop(0, c2); grad.addColorStop(1, c1); ctx.fillStyle = grad; ctx.beginPath();
+        if (shape === 'circle') ctx.arc(0, 0, r, 0, 7); else if (shape === 'diamond') { ctx.moveTo(0, -r * 1.1); ctx.lineTo(r, 0); ctx.lineTo(0, r * 1.1); ctx.lineTo(-r, 0); } else if (shape === 'square') ctx.roundRect(-r * .9, -r * .9, r * 1.8, r * 1.8, 6); else if (shape === 'triangle') { ctx.moveTo(0, -r * 1.05); ctx.lineTo(r * 1.05, r * .8); ctx.lineTo(-r * 1.05, r * .8); } else if (shape === 'hex') { for (let i = 0; i < 6; i++) ctx.lineTo(Math.cos(i * Math.PI / 3) * r, Math.sin(i * Math.PI / 3) * r); } else { for (let i = 0; i < 10; i++) { const rr = i % 2 ? r * .5 : r * 1.05; ctx.lineTo(Math.cos(-Math.PI / 2 + i * Math.PI / 5) * rr, Math.sin(-Math.PI / 2 + i * Math.PI / 5) * rr); } }
+        ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.ellipse(-r * .35, -r * .4, r * .3, r * .18, -0.6, 0, 7); ctx.fill(); ctx.restore();
       }
       const sleep = ms => new Promise(r => setTimeout(r, ms));
-      start();
+      async function trySwap(i, j) {
+        busy = true; hint = null; hintT = 0; const di = (j % N) - (i % N), dj = Math.floor(j / N) - Math.floor(i / N);
+        [g[i], g[j]] = [g[j], g[i]]; anim.push({ i, k: 'swap', dx: di, dy: dj, t: 0, d: 0.18 }, { i: j, k: 'swap', dx: -di, dy: -dj, t: 0, d: 0.18 }); await sleep(180);
+        if (!matches().size) { [g[i], g[j]] = [g[j], g[i]]; anim.push({ i, k: 'swap', dx: di, dy: dj, t: 0, d: 0.18 }, { i: j, k: 'swap', dx: -di, dy: -dj, t: 0, d: 0.18 }); api.sound('bad'); api.vibrate(20); await sleep(180); busy = false; return; }
+        moves--; a.hdr.set(1, moves); let combo = 0;
+        while (true) { const m = matches(); if (!m.size) break; combo++; score += m.size * 10 * combo; a.hdr.set(0, score); api.sound('good'); api.vibrate(10); m.forEach(k => anim.push({ i: k, k: 'pop', t: 0, d: 0.22 })); await sleep(220); m.forEach(k => g[k] = -1);
+          for (let c = 0; c < N; c++) { let write = N - 1; for (let r = N - 1; r >= 0; r--) { if (g[r * N + c] >= 0) { if (write !== r) { g[write * N + c] = g[r * N + c]; g[r * N + c] = -1; anim.push({ i: write * N + c, k: 'fall', from: write - r, t: 0, d: 0.25 }); } write--; } } for (let r = write; r >= 0; r--) { g[r * N + c] = api.rand(0, 5); anim.push({ i: r * N + c, k: 'fall', from: write + 1, t: 0, d: 0.3 }); } }
+          await sleep(280); }
+        if (combo >= 2) { api.addCoins(combo); api.toast('Комбо ×' + combo); } busy = false;
+        if (!findHint()) { api.toast('Ходов нет — перемешиваю'); do { g = Array.from({ length: N * N }, () => api.rand(0, 5)); } while (matches().size || !findHint()); }
+        if (moves <= 0) { api.best('match3', score); api.end({ title: 'Ходы закончились', reward: Math.floor(score / 100), text: 'Счёт: ' + score, onAgain: start }); }
+      }
+      this.unmount = a.stop; start();
     }
   });
 
