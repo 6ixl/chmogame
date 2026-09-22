@@ -1,4 +1,4 @@
-/* Чмогейм — ядро: сохранения, монеты, звук, вибрация, навигация, реестр игр */
+/* Аркадия — ядро: сохранения, монеты, звук, вибрация, навигация, реестр игр */
 (function () {
   const LS_KEY = 'chmogame.v1';
   const defaults = { coins: 100, sound: true, vibro: true, games: {}, best: {}, daily: null, totalPlays: 0 };
@@ -146,6 +146,12 @@
       raf = requestAnimationFrame(loop);
       return { hdr, cv, ctx, pos, stop: () => { running = false; cancelAnimationFrame(raf); cv.destroy(); if (o.onKey) window.removeEventListener('keydown', o.onKey); } };
     },
+    /* выбор сложности бота при запуске: cb(0|1|2). Запоминает последний выбор */
+    difficulty: (id, cb) => {
+      const last = state.games[id + '_diff'];
+      const body = h('div', { class: 'row', style: 'flex-direction:column' }, [['😊 Лёгкий', 'бот поддаётся — легко выиграть'], ['🙂 Средний', 'придётся играть нормально'], ['😈 Сложный', 'бот играет в полную силу']].map(([n, d], i) => h('button', { class: 'btn ' + (i === (last == null ? 1 : last) ? 'primary' : ''), style: 'width:100%;flex-direction:column;gap:2px', onclick: () => { state.games[id + '_diff'] = i; save(); m.close(); sound('tap'); cb(i); } }, h('b', null, n), h('span', { style: 'font-size:11px;opacity:.75' }, d))));
+      const m = modal({ title: 'Сложность', body, buttons: [{ label: 'В меню', onClick: () => showHub() }] });
+    },
     swipe: (el, fn) => {
       let sx, sy; el.addEventListener('pointerdown', e => { sx = e.clientX; sy = e.clientY; });
       el.addEventListener('pointerup', e => { if (sx == null) return; const dx = e.clientX - sx, dy = e.clientY - sy; sx = null; if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) { fn('tap', e); return; } fn(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'r' : 'l') : (dy > 0 ? 'd' : 'u'), e); });
@@ -191,7 +197,7 @@
     closeCurrent();
     const screen = $('#screen'); screen.innerHTML = ''; screen.className = '';
     $('#btn-back').classList.add('hidden');
-    setTitle('Чмогейм');
+    setTitle('Аркадия');
     window.renderHub(screen, api, games);
   }
   function showSettings() {
@@ -216,7 +222,7 @@
       h('button', { class: 'btn', style: 'width:100%;margin-bottom:10px', onclick: importBackup }, '📥 Вставить код бэкапа'),
       h('div', { class: 'section-title' }, 'Опасная зона'),
       h('button', { class: 'btn', style: 'width:100%', onclick: () => modal({ title: 'Сбросить прогресс?', text: 'Все уровни, рекорды и монеты будут удалены.', buttons: [{ label: 'Отмена' }, { label: 'Сбросить', cls: 'primary', onClick: () => { state = Object.assign({}, defaults, { games: {}, best: {} }); save(); setCoins(state.coins); showHub(); } }] }) }, 'Сбросить прогресс'),
-      h('div', { class: 'hint-text', style: 'margin-top:20px' }, 'Чмогейм · офлайн-сборник игр · v' + APP.version)
+      h('div', { class: 'hint-text', style: 'margin-top:20px' }, 'Аркадия · офлайн-сборник игр · v' + APP.version)
     );
   }
 

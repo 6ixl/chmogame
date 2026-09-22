@@ -1,1 +1,1 @@
-window.APP = { version: '1.7', repo: '6ixl/chmogame' };
+window.APP = { version: '1.8', repo: '6ixl/chmogame' };

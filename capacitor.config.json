@@ -1,6 +1,6 @@
 {
   "appId": "ru.chmogame.app",
-  "appName": "Чмогейм",
+  "appName": "Аркадия",
   "webDir": "www",
   "android": {
     "allowMixedContent": false,

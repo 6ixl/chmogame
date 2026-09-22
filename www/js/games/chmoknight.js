@@ -1,6 +1,6 @@
 /* Чмонайт — рогалик в духе Soul Knight: процедурные подземелья, оружие, боссы, сохранение */
 Games.register({
-  id: 'chmoknight', title: 'Чмонайт', icon: '🗡', cat: 'arcade', desc: 'Рогалик: случайные подземелья, 22 вида оружия, боссы, прокачка, сохранение', bestLabel: 'Лучший этаж',
+  id: 'chmoknight', title: 'Клинок Бездны', icon: '🗡', cat: 'arcade', desc: 'Рогалик: случайные подземелья, 22 вида оружия, боссы, прокачка, сохранение', bestLabel: 'Лучший этаж',
   mount(screen, api) {
     const { h } = api;
     const W = 360, H = 560, T = 32, RW = 11, RH = 9, CL = 3;
@@ -102,7 +102,7 @@ Games.register({
     const nearestEnemy = () => { let b = null, bd = 400; for (const e of enemies) { const d = Math.hypot(e.x - p.x, e.y - p.y); if (d < bd) { bd = d; b = e; } } return b; };
     function hitEnemy(e, dmg) { e.hp -= dmg; e.hurt = 0.12; effects.push({ t: 'dmg', x: e.x + api.rand(-8, 8), y: e.y - e.r, v: Math.round(dmg * 10) / 10, life: 0.6 }); if (e.hp <= 0 && !e.dead) { e.dead = true; kills++; const nc = e.big ? 30 : api.rand(0, 2); for (let i = 0; i < nc; i++) items.push({ t: 'coin', x: e.x + api.rand(-20, 20), y: e.y + api.rand(-20, 20) }); if (Math.random() < 0.12) items.push({ t: 'heart', x: e.x, y: e.y }); for (let i = 0; i < 8; i++) effects.push({ t: 'part', x: e.x, y: e.y, vx: (Math.random() - .5) * 260, vy: (Math.random() - .5) * 260, life: 0.5, col: '#f87171' }); if (e.big) { items.push({ t: 'chest', x: e.x, y: e.y }); items.push({ t: 'portal', x: (e.room.x + RW / 2) * T, y: (e.room.y + 2) * T }); api.sound('win'); api.vibrate([30, 50, 30, 50, 60]); } else api.sound('boom'); } }
     function hurtPlayer(n) { if (p.hurt > 0) return; p.hurt = 0.8; p.armorT = 4; api.vibrate(40); api.sound('bad'); while (n > 0) { if (p.armor >= 1) p.armor--; else p.hp--; n--; } if (p.hp <= 0) die(); }
-    function die() { alive = false; clearSave(); const reward = Math.floor(coins / 2) + floor * 5; api.addCoins(reward); api.end({ win: false, title: 'Чмонайт пал на этаже ' + floor, text: `Врагов убито: ${kills}. Награда: +${reward} монет`, again: 'Заново', onAgain: menu }); }
+    function die() { alive = false; clearSave(); const reward = Math.floor(coins / 2) + floor * 5; api.addCoins(reward); api.end({ win: false, title: 'Герой пал на этаже ' + floor, text: `Врагов убито: ${kills}. Награда: +${reward} монет`, again: 'Заново', onAgain: menu }); }
     function nextFloor() { paused = true; const opts = api.shuffle([['❤ +2 макс. здоровья', () => { buffs.maxhp += 2; p.hp = Math.min(buffs.maxhp, p.hp + 2); }], ['⚔ Урон +25%', () => buffs.dmg += 0.25], ['⚡ +60 энергии', () => { buffs.maxen += 60; p.en = buffs.maxen; }], ['👟 Скорость +15%', () => buffs.spd += 0.15], ['💚 Полное лечение', () => { p.hp = buffs.maxhp; p.armor = 6; }], ['🔋 Регенерация энергии ×1.5', () => buffs.regen *= 1.5], ['🎁 Случайное оружие', () => { const w = randomWeapon(); if (p.weapons.length < 2) p.weapons.push(w); else p.weapons[p.wi] = w; }]]).slice(0, 3);
       const body = h('div', { class: 'row', style: 'flex-direction:column' }, opts.map(([n, f]) => h('button', { class: 'btn', style: 'width:100%', onclick: () => { f(); m.close(); floor++; hdr.set(0, floor); api.addCoins(5); genFloor(); paused = false; api.sound('good'); if (floor === 31) api.modal({ title: '🏆 30 этажей пройдено!', text: 'Вы прошли основную кампанию. Дальше — бесконечный режим.', buttons: [{ label: 'Вперёд', cls: 'primary' }] }); } }, n)));
       const m = api.modal({ title: 'Этаж ' + floor + ' пройден!', text: 'Выбери усиление', body, buttons: [] });
@@ -113,7 +113,7 @@ Games.register({
         sv ? h('button', { class: 'btn primary', style: 'width:100%', onclick: () => { m.close(); newRun(1, true); } }, '▶ Продолжить (этаж ' + sv.floor + ')') : null,
         h('button', { class: 'btn ' + (sv ? '' : 'primary'), style: 'width:100%', onclick: () => { m.close(); clearSave(); newRun(1); } }, '🆕 Новый забег'),
         h('button', { class: 'btn', style: 'width:100%', onclick: () => { m.close(); levelPick(); } }, '🗺 Выбор этажа (открыто ' + maxFloor + ')'));
-      const m = api.modal({ title: '🗡 Чмонайт', text: 'Лучший этаж: ' + maxFloor + ' · Кампания: 30 этажей, далее бесконечно', body, buttons: [{ label: 'В меню', onClick: api.exit }] });
+      const m = api.modal({ title: '🗡 Клинок Бездны', text: 'Лучший этаж: ' + maxFloor + ' · Кампания: 30 этажей, далее бесконечно', body, buttons: [{ label: 'В меню', onClick: api.exit }] });
     }
     function levelPick() { const box = h('div', { class: 'levels', style: 'max-height:50vh;overflow:auto' }); for (let i = 1; i <= Math.max(maxFloor, 1); i++) box.append(h('div', { class: 'lvl ' + (i < maxFloor ? 'done' : 'cur'), onclick: () => { m.close(); clearSave(); newRun(i); } }, i)); const m = api.modal({ title: 'Выбор этажа', text: 'Старт с этажа даёт снаряжение под его уровень', body: box, buttons: [{ label: 'Назад', onClick: menu }] }); }
 
