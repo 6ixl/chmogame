@@ -1,4 +1,4 @@
-# Выпуск новой версии: bump версии, сборка APK, коммит, релиз на GitHub с APK.
+﻿# Выпуск новой версии: bump версии, сборка APK, коммит, релиз на GitHub с APK.
 # Использование: powershell -File tools/release.ps1 1.4 "Что нового"
 param([string]$Version, [string]$Notes = "Обновление")
 $ErrorActionPreference = "Stop"
