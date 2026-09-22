@@ -10,7 +10,7 @@ window.renderHub = function (screen, api, games) {
   } else dailyEl = h('div', { class: 'daily' }, '✓ Бонус на сегодня получен');
 
   screen.append(h('div', { class: 'hub-hero' },
-    h('h1', null, 'Аркадия'),
+    h('h1', null, 'Чмога'),
     h('p', null, games.length + ' игр · без интернета · монеты общие для всех игр'),
     dailyEl));
 

@@ -1,4 +1,4 @@
-/* Аркадия — ядро: сохранения, монеты, звук, вибрация, навигация, реестр игр */
+/* Чмога — ядро: сохранения, монеты, звук, вибрация, навигация, реестр игр */
 (function () {
   const LS_KEY = 'chmogame.v1';
   const defaults = { coins: 100, sound: true, vibro: true, games: {}, best: {}, daily: null, totalPlays: 0 };
@@ -197,7 +197,7 @@
     closeCurrent();
     const screen = $('#screen'); screen.innerHTML = ''; screen.className = '';
     $('#btn-back').classList.add('hidden');
-    setTitle('Аркадия');
+    setTitle('Чмога');
     window.renderHub(screen, api, games);
   }
   function showSettings() {
@@ -222,7 +222,7 @@
       h('button', { class: 'btn', style: 'width:100%;margin-bottom:10px', onclick: importBackup }, '📥 Вставить код бэкапа'),
       h('div', { class: 'section-title' }, 'Опасная зона'),
       h('button', { class: 'btn', style: 'width:100%', onclick: () => modal({ title: 'Сбросить прогресс?', text: 'Все уровни, рекорды и монеты будут удалены.', buttons: [{ label: 'Отмена' }, { label: 'Сбросить', cls: 'primary', onClick: () => { state = Object.assign({}, defaults, { games: {}, best: {} }); save(); setCoins(state.coins); showHub(); } }] }) }, 'Сбросить прогресс'),
-      h('div', { class: 'hint-text', style: 'margin-top:20px' }, 'Аркадия · офлайн-сборник игр · v' + APP.version)
+      h('div', { class: 'hint-text', style: 'margin-top:20px' }, 'Чмога · офлайн-сборник игр · v' + APP.version)
     );
   }
 
