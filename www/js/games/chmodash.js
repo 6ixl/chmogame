@@ -1,6 +1,7 @@
 /* Неон Дэш — платформер в духе Geometry Dash: 7 режимов (куб, корабль, шар, НЛО, волна, робот, паук) */
 Games.register({
-  id: 'chmodash', title: 'Неон Дэш', icon: '🟧', cat: 'arcade', desc: 'Geometry Dash: 14 уровней, 7 режимов — куб, корабль, шар, НЛО, волна, робот, паук', progress: api => 'Пройдено ' + Object.keys(api.load('dash_done', {})).filter(k => !k.startsWith('r')).length + '/14',
+  id: 'chmodash', title: 'Неон Дэш', icon: '🟧', cat: 'arcade',
+  skipLevel: api => { const d = api.load('dash_done', {}); const next = [...Array(14).keys()].find(i => !d[i]); if (next == null) return false; d[next] = true; api.store('dash_done', d); const bp = api.load('dash_best', {}); bp[next] = 100; api.store('dash_best', bp); return true; }, desc: 'Geometry Dash: 14 уровней, 7 режимов — куб, корабль, шар, НЛО, волна, робот, паук', progress: api => 'Пройдено ' + Object.keys(api.load('dash_done', {})).filter(k => !k.startsWith('r')).length + '/14',
   mount(screen, api) {
     const { h } = api;
     const W = 400, H = 300, GY = 240, CY = 60, S = 30;

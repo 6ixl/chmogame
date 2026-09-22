@@ -1,6 +1,7 @@
 /* Карточная Арена — полный клон Clash Royale: 54 карты, арены, трофеи, бой с ботом или другом по Wi-Fi */
 Games.register({
-  id: 'cardarena', title: 'Карточная Арена', icon: '⚔️', cat: 'board', desc: '54 карты как в Clash Royale: войска, здания, заклинания, арены и трофеи', bestLabel: 'Трофеи',
+  id: 'cardarena', title: 'Карточная Арена', icon: '⚔️', cat: 'board',
+  skipLevel: api => { const i = Math.min(7, api.load('ca_arena', 0) + 1); api.store('ca_arena', i); const st = api.load('ca_st', { w: 0, l: 0, trophies: 0 }); st.trophies = Math.max(st.trophies, [0, 200, 400, 600, 900, 1200, 1600, 2000][i]); api.store('ca_st', st); return true; }, desc: '54 карты как в Clash Royale: войска, здания, заклинания, арены и трофеи', bestLabel: 'Трофеи',
   mount(screen, api) {
     const { h } = api;
     const W = 360, H = 620, LANE_L = 84, LANE_R = 276, MID = H / 2, RIVER = 22;

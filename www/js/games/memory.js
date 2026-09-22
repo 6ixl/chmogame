@@ -1,6 +1,7 @@
 /* Найди пару */
 Games.register({
   id: 'memory', title: 'Найди пару', icon: '🃏', cat: 'puzzle', desc: 'Открывай карточки, запоминай пары', bestLabel: 'Меньше ходов',
+  skipLevel: api => { api.store('memory_lvl', api.load('memory_lvl', 0) + 1); return true; },
   mount(screen, api) {
     const { h } = api;
     const EMOJI = '🍎🍌🍇🍓🍒🥝🍍🥑🌽🥕🍔🍕🍩🍪🎈🎁⚽🏀🎸🎲🚗✈️🚀🐶🐱🦊🐼🐸🦋🌙⭐🔥🐙🦄🍉🍋🎯🎹🛸⛵'.match(/\p{Extended_Pictographic}️?/gu);

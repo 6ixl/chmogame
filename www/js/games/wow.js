@@ -1,6 +1,7 @@
 /* Слова (Words of Wonders): собери слова из букв на колесе */
 Games.register({
   id: 'wow', title: 'Слова', icon: '🔤', cat: 'words', desc: 'Кроссворд из букв на колесе. 400 уровней',
+  skipLevel: api => { const p = api.load('wow', { lvl: 0, done: [] }); if (!p.done.includes(p.lvl)) p.done.push(p.lvl); p.lvl = Math.min(p.lvl + 1, 419); api.store('wow', p); return true; },
   progress: api => 'Уровень ' + (api.load('wow', { lvl: 0 }).lvl + 1),
   mount(screen, api) {
     const { h } = api;

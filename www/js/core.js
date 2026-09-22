@@ -195,7 +195,52 @@
     state.totalPlays++; save();
     current = def;
     try { def.mount(screen, api); } catch (e) { console.error(e); toast('Ошибка: ' + e.message); }
+    addSkipButton(def, screen);
   }
+  /* ---------- пропуск уровня за монеты прямо в игре ---------- */
+  const SKIP_COST = 100;
+  function isLevelGame(def) { return !!(def.skipLevel || def.progress); }
+  function addSkipButton(def, screen) {
+    if (!isLevelGame(def)) return;
+    const btn = h('button', { class: 'skip-btn', onclick: e => { e.stopPropagation(); doSkip(def); } }, '⏭ ' + SKIP_COST + ' ●');
+    screen.append(btn);
+  }
+  function doSkip(def) {
+    modal({ title: 'Пропустить уровень?', text: 'Спишется ' + SKIP_COST + ' монет, и вы перейдёте к следующему уровню этой игры.', buttons: [{ label: 'Отмена' }, { label: 'Пропустить за ' + SKIP_COST, cls: 'gold', onClick: () => {
+      if (!spend(SKIP_COST)) return;
+      let ok = false;
+      try { if (def.skipLevel) ok = def.skipLevel(api) !== false; } catch (e) { ok = false; }
+      if (!ok) {
+        const k = def.id + '_lvl';
+        const st = state.games[def.id];
+        if (st && typeof st === 'object' && typeof st.lvl === 'number') { st.lvl++; if (Array.isArray(st.done) && !st.done.includes(st.lvl - 1)) st.done.push(st.lvl - 1); ok = true; }
+        else { state.games[k] = (typeof state.games[k] === 'number' ? state.games[k] : 0) + 1; ok = true; }
+      }
+      save(); sound('win'); vibrate([20, 40, 20]);
+      if (ok) { toast('Уровень пропущен'); openGame(def); } else { toast('В этой игре нечего пропускать'); setCoins(state.coins + SKIP_COST); }
+    } }] });
+  }
+
+  /* ---------- секретное меню: несколько нажатий по счётчику монет ---------- */
+  let coinTaps = 0, coinTapT = 0;
+  function cheatMenu() {
+    const input = h('input', { type: 'number', placeholder: 'Своя сумма', style: 'width:100%;background:var(--bg2);color:var(--text);border:0;border-radius:10px;padding:10px;font-size:15px;margin-top:8px' });
+    const give = n => { addCoins(n); };
+    const body = h('div', null,
+      h('div', { class: 'row' }, [100, 1000, 10000].map(n => h('button', { class: 'btn small gold', onclick: () => give(n) }, '+' + n))),
+      h('div', { class: 'row', style: 'margin-top:6px' }, [100000, 1000000].map(n => h('button', { class: 'btn small gold', onclick: () => give(n) }, '+' + n.toLocaleString('ru')))),
+      input,
+      h('button', { class: 'btn primary', style: 'width:100%;margin-top:8px', onclick: () => { const n = parseInt(input.value, 10); if (n > 0) { give(n); input.value = ''; } } }, 'Выдать указанное'),
+      h('button', { class: 'btn', style: 'width:100%;margin-top:8px', onclick: () => { setCoins(0); toast('Монеты обнулены'); } }, 'Обнулить монеты'));
+    modal({ title: '🔓 Секретное меню', text: 'Сейчас монет: ' + state.coins, body, buttons: [{ label: 'Закрыть' }] });
+  }
+  $('#coins').addEventListener('click', () => {
+    const now = Date.now();
+    if (now - coinTapT > 1500) coinTaps = 0;
+    coinTapT = now; coinTaps++;
+    if (coinTaps >= 3 && coinTaps < 10) toast('…' + (10 - coinTaps));
+    if (coinTaps >= 10) { coinTaps = 0; sound('win'); vibrate([20, 40, 20, 40, 60]); cheatMenu(); }
+  });
   function closeCurrent() {
     if (current && current.unmount) { try { current.unmount(); } catch (e) {} }
     current = null; $('#modal-root').innerHTML = '';

@@ -1,6 +1,7 @@
 /* Чмонайт — рогалик в духе Soul Knight: процедурные подземелья, оружие, боссы, сохранение */
 Games.register({
-  id: 'chmoknight', title: 'Клинок Бездны', icon: '🗡', cat: 'arcade', desc: 'Рогалик: случайные подземелья, 22 вида оружия, боссы, прокачка, сохранение', bestLabel: 'Лучший этаж',
+  id: 'chmoknight', title: 'Клинок Бездны', icon: '🗡', cat: 'arcade',
+  skipLevel: api => { const mx = api.load('ck_max', 1) + 1; api.store('ck_max', mx); const sv = api.load('ck_save', null); if (sv) { sv.floor++; api.store('ck_save', sv); } return true; }, desc: 'Рогалик: случайные подземелья, 22 вида оружия, боссы, прокачка, сохранение', bestLabel: 'Лучший этаж',
   mount(screen, api) {
     const { h } = api;
     const W = 360, H = 560, T = 32, RW = 11, RH = 9, CL = 3;

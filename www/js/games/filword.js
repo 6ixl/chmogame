@@ -1,6 +1,7 @@
 /* Филворды: найди все слова в сетке (слова змейкой, без диагоналей) */
 Games.register({
   id: 'filword', title: 'Филворды', icon: '🧩', cat: 'words', desc: 'Слова спрятаны змейкой в сетке',
+  skipLevel: api => { const p = api.load('filword', { lvl: 0 }); p.lvl++; api.store('filword', p); return true; },
   progress: api => 'Уровень ' + (api.load('filword', { lvl: 0 }).lvl + 1),
   mount(screen, api) {
     const { h } = api;

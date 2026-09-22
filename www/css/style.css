@@ -258,3 +258,5 @@ textarea { -webkit-user-select: text; user-select: text; }
 .ca-arena.lock { opacity: .6; }
 .ca-arena span { color: var(--muted); font-size: 12px; }
 .ca-nm { font-size: 8px; line-height: 1; color: var(--muted); text-align: center; }
+.skip-btn { position: absolute; right: 6px; top: 52px; z-index: 12; background: rgba(251,191,36,.85); color: #1a1a1a; border: 0; border-radius: 999px; padding: 4px 9px; font-size: 11px; font-weight: 800; box-shadow: 0 2px 8px rgba(0,0,0,.45); }
+.skip-btn:active { background: var(--gold); }
