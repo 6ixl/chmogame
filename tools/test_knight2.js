@@ -6,7 +6,7 @@ const srv = http.createServer((req, res) => { let p = path.join(root, decodeURIC
   await page.goto('http://localhost:5178/'); await page.evaluate(() => Games.open(Games.list.find(g => g.id === 'chmoknight'))); await page.waitForTimeout(400);
   const links = (await page.evaluate(() => window.__ck())).links; await page.evaluate(i => window.__tp(i), links[0]); await page.waitForTimeout(300);
   await page.keyboard.down(' ');
-  for (let i = 0; i < 8; i++) { await page.waitForTimeout(1500); const s = await page.evaluate(() => window.__ck()); console.log('t', i, 'bullets', s.b, 'enemies', s.en, 'room', s.room); if (i === 1) await page.screenshot({ path: 'tools/shots/knight3.png' }); }
+  for (let i = 0; i < 8; i++) { await page.waitForTimeout(1500); const s = await page.evaluate(() => window.__ck()); console.log('t', i, 'bullets', s.b, 'enemies', s.en, 'room', s.room); if (i === 0) await page.screenshot({ path: 'tools/shots/knight3.png' }); }
   console.log(await page.evaluate(() => document.querySelector('#modal-root').innerText.split(String.fromCharCode(10)).join(' | ') || 'alive'));
   console.log('errors:', errs.length ? errs.join(' | ') : 'none'); await b.close(); srv.close();
 })();

@@ -46,3 +46,6 @@ cd android
 # результат: android\app\build\outputs\apk\release\app-release.apk
 ```
 Ключ подписи: `android/chmogame.keystore` (пароль в `android/keystore.properties`). Не теряйте его — без него нельзя обновить установленное приложение.
+
+## Ассеты
+- Спрайты «Чмонайта»: [Kenney Tiny Dungeon](https://kenney.nl/assets/tiny-dungeon) (CC0), лежат в `www/assets/tinydungeon.png`.

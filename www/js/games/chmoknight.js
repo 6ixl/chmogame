@@ -24,7 +24,12 @@ Games.register({
       knight: { e: '🛡', hp: 8, spd: 60, r: 16, melee: 2 }, mage: { e: '🧙', hp: 5, spd: 40, r: 14, shoot: 2.2, keep: 220, spread: 3 }, boss: { e: '👹', hp: 60, spd: 45, r: 30, shoot: 1.2, keep: 200, ring: true, melee: 2 }
     };
     let map, rooms, floor, p, enemies, bullets, ebullets, items, cam, alive, coins, run, effects, joy = null, fire = null, paused = false, buffs, kills, best = api.bestOf('chmoknight') || 0;
-    let hdr;
+    let hdr, decor = [];
+    const SHEET = new Image(); SHEET.src = 'assets/tinydungeon.png'; const SC = 12; // тайлсет Kenney Tiny Dungeon (CC0), 12 колонок по 16px
+    const tile = (ctx, i, x, y, w, hgt, flip) => { if (!SHEET.complete || !SHEET.naturalWidth) return; const sx = (i % SC) * 16, sy = Math.floor(i / SC) * 16; if (flip) { ctx.save(); ctx.translate(x + (w || T), y); ctx.scale(-1, 1); ctx.drawImage(SHEET, sx, sy, 16, 16, 0, 0, w || T, hgt || T); ctx.restore(); } else ctx.drawImage(SHEET, sx, sy, 16, 16, x, y, w || T, hgt || T); };
+    const SPR = { player: 97, slime: 108, bat: 120, shooter: 121, knight: 96, mage: 111, boss: 110, chest: 89, chestOpen: 90, heart: 115, coin: 101, portal: 32, doorLocked: 46, wallFace: 40, wallTop: 36, torch: 8, floors: [48, 48, 48, 49, 50, 51, 48, 48], decor: [54, 55, 56, 12, 24, 42, 63, 41] };
+    const WICON = { 'Пистолет': 129, 'Дробовик': 117, 'Автомат': 130, 'Лук': 131, 'Лазер': 129, 'Ракетница': 118, 'Двойной пистолет': 130, 'Снайперка': 131, 'Огнемёт': 119, 'Меч': 104, 'Плазма': 129, 'Бластер босса': 107 };
+    const hashXY = (x, y) => ((x * 73856093) ^ (y * 19349663)) >>> 0;
 
     /* ---------- генерация этажа ---------- */
     function genFloor() {
@@ -41,7 +46,8 @@ Games.register({
       const dist = Array(9).fill(-1); dist[4] = 0; const q = [4]; while (q.length) { const i = q.shift(); rooms[i].links.forEach(j => { if (dist[j] < 0) { dist[j] = dist[i] + 1; q.push(j); } }); }
       const bossIdx = dist.indexOf(Math.max(...dist)); rooms[4].type = 'start'; rooms[4].cleared = true; rooms[bossIdx].type = 'boss';
       const others = api.shuffle(rooms.map((r, i) => i).filter(i => i !== 4 && i !== bossIdx)); rooms[others[0]].type = 'treasure'; if (others[1] != null && Math.random() < 0.5) rooms[others[1]].type = 'treasure';
-      items = []; enemies = []; bullets = []; ebullets = []; effects = [];
+      items = []; enemies = []; bullets = []; ebullets = []; effects = []; decor = [];
+      rooms.forEach(r => { const n = api.rand(1, 4); for (let k = 0; k < n; k++) { const dx = api.rand(1, RW - 2), dy = api.rand(1, RH - 2); if (!map[r.y + dy][r.x + dx] && Math.hypot(dx - RW / 2, dy - RH / 2) > 2.5) decor.push({ x: r.x + dx, y: r.y + dy, t: SPR.decor[api.rand(0, SPR.decor.length - 1)] }); } });
       rooms.forEach(r => { if (r.type === 'treasure') { items.push({ t: 'chest', x: (r.x + RW / 2) * T, y: (r.y + RH / 2) * T }); r.cleared = true; } });
       const s = rooms[4]; p.x = (s.x + RW / 2) * T; p.y = (s.y + RH / 2) * T; cam = { x: p.x - W / 2, y: p.y - H / 2 };
     }
@@ -81,7 +87,7 @@ Games.register({
       p.cd -= dt; p.hurt -= dt; p.armorT -= dt; if (p.armorT <= 0 && p.armor < 6) { p.armor += dt * 0.8; if (p.armor > 6) p.armor = 6; } p.en = Math.min(buffs.maxen, p.en + dt * 10 * buffs.regen);
       if (joy) { const dx = joy.dx, dy = joy.dy; const d = Math.hypot(dx, dy); if (d > 6) { const sp = 170 * buffs.spd * Math.min(1, d / 50); moveEnt(p, dx / d * sp * dt, dy / d * sp * dt); p.a = Math.atan2(dy, dx); } }
       const w = p.weapons[p.wi]; if (fire) shoot(w);
-      const room = roomAt(p.x, p.y); if (room && !room.visited) { room.visited = true; if (!room.cleared && room.type !== 'start') spawnRoom(room); }
+      const room = roomAt(p.x, p.y); if (room && !room.visited) { const inside = p.x > (room.x + 1.6) * T && p.x < (room.x + RW - 1.6) * T && p.y > (room.y + 1.6) * T && p.y < (room.y + RH - 1.6) * T; if (inside) { room.visited = true; if (!room.cleared && room.type !== 'start') spawnRoom(room); } }
       if (room && room.locked && !enemies.some(e => e.room === room)) { room.locked = false; room.cleared = true; api.sound('coin'); api.addCoins(0); if (room.type !== 'boss') api.toast('Комната зачищена'); }
       // пули игрока
       bullets.forEach(b => { b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; if (solid(b.x, b.y) || b.life <= 0) { b.dead = true; if (b.splash) splash(b); return; } for (const e of enemies) { if (e.dead || b.hit.has(e)) continue; if (Math.hypot(e.x - b.x, e.y - b.y) < e.r + 4) { hitEnemy(e, b.dmg); b.hit.add(e); if (b.splash) { splash(b); b.dead = true; } else if (!b.pierce) { b.dead = true; } break; } } });
@@ -93,26 +99,38 @@ Games.register({
       enemies = enemies.filter(e => !e.dead);
       ebullets.forEach(b => { b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; if (solid(b.x, b.y) || b.life <= 0) b.dead = true; else if (Math.hypot(b.x - p.x, b.y - p.y) < p.r + 4) { b.dead = true; hurtPlayer(1); } }); ebullets = ebullets.filter(b => !b.dead);
       // предметы
-      items.forEach(it => { const d = Math.hypot(it.x - p.x, it.y - p.y); if (it.t === 'coin' && d < 60) { it.x += (p.x - it.x) * dt * 8; it.y += (p.y - it.y) * dt * 8; } if (d < p.r + 10) { if (it.t === 'coin') { coins++; hdr.set(1, coins); it.dead = true; api.sound('coin'); } else if (it.t === 'heart') { p.hp = Math.min(buffs.maxhp, p.hp + 1); it.dead = true; api.sound('good'); } else if (it.t === 'chest') { it.dead = true; const w = randomWeapon(); items.push({ t: 'weapon', w, x: it.x, y: it.y + 30 }); api.sound('win'); api.toast('Сундук: ' + w.n); } else if (it.t === 'weapon' && (it.cool || 0) <= 0) { it.dead = true; if (p.weapons.length < 2) p.weapons.push(it.w); else { const old = p.weapons[p.wi]; p.weapons[p.wi] = it.w; items.push({ t: 'weapon', w: old, x: p.x, y: p.y, cool: 1.5 }); } p.wi = p.weapons.indexOf(it.w); api.sound('good'); api.toast('Взято: ' + it.w.n); } else if (it.t === 'portal') { it.dead = true; nextFloor(); } } if (it.cool) it.cool -= dt; }); items = items.filter(i => !i.dead);
+      items.forEach(it => { const d = Math.hypot(it.x - p.x, it.y - p.y); if (it.t === 'coin' && d < 60) { it.x += (p.x - it.x) * dt * 8; it.y += (p.y - it.y) * dt * 8; } if (d < p.r + 10) { if (it.t === 'coin') { coins++; hdr.set(1, coins); it.dead = true; api.sound('coin'); } else if (it.t === 'heart') { p.hp = Math.min(buffs.maxhp, p.hp + 1); it.dead = true; api.sound('good'); } else if (it.t === 'chest') { it.dead = true; decor.push({ x: Math.floor(it.x / T), y: Math.floor(it.y / T), t: SPR.chestOpen }); const w = randomWeapon(); items.push({ t: 'weapon', w, x: it.x, y: it.y + 30 }); api.sound('win'); api.toast('Сундук: ' + w.n); } else if (it.t === 'weapon' && (it.cool || 0) <= 0) { it.dead = true; if (p.weapons.length < 2) p.weapons.push(it.w); else { const old = p.weapons[p.wi]; p.weapons[p.wi] = it.w; items.push({ t: 'weapon', w: old, x: p.x, y: p.y, cool: 1.5 }); } p.wi = p.weapons.indexOf(it.w); api.sound('good'); api.toast('Взято: ' + it.w.n); } else if (it.t === 'portal') { it.dead = true; nextFloor(); } } if (it.cool) it.cool -= dt; }); items = items.filter(i => !i.dead);
       effects.forEach(f => f.life -= dt); effects = effects.filter(f => f.life > 0);
       cam.x += (p.x - W / 2 - cam.x) * Math.min(1, dt * 6); cam.y += (p.y - H / 2 - cam.y) * Math.min(1, dt * 6);
     }
     function splash(b) { effects.push({ t: 'boom', x: b.x, y: b.y, r: b.splash, life: 0.25 }); enemies.forEach(e => { if (Math.hypot(e.x - b.x, e.y - b.y) < b.splash + e.r) hitEnemy(e, b.dmg * 0.8); }); api.sound('boom'); }
 
     function draw(ctx) {
+      ctx.imageSmoothingEnabled = false;
       ctx.fillStyle = '#0a0a14'; ctx.fillRect(0, 0, W, H); ctx.save(); ctx.translate(-Math.round(cam.x), -Math.round(cam.y));
       const x0 = Math.max(0, Math.floor(cam.x / T)), y0 = Math.max(0, Math.floor(cam.y / T)), x1 = Math.min(COLS - 1, Math.ceil((cam.x + W) / T)), y1 = Math.min(ROWS - 1, Math.ceil((cam.y + H) / T));
-      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { if (map[y][x]) { const open = (y + 1 < ROWS && !map[y + 1][x]); ctx.fillStyle = open ? '#3b3b6b' : '#22223a'; ctx.fillRect(x * T, y * T, T, T); } else { ctx.fillStyle = (x + y) % 2 ? '#1c1c30' : '#1e1e34'; ctx.fillRect(x * T, y * T, T, T); } }
-      rooms.forEach(r => { if (r.locked) r.doors.forEach(([dx, dy]) => { ctx.fillStyle = '#7f1d1d'; ctx.fillRect(dx * T + 2, dy * T + 2, T - 4, T - 4); }); if (r.type === 'boss' && !r.visited) { ctx.fillStyle = '#7f1d1d'; ctx.font = '20px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('💀', (r.x + RW / 2) * T, (r.y + RH / 2) * T); } });
-      ctx.font = '22px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      items.forEach(it => { if (it.t === 'coin') { ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(it.x, it.y, 5, 0, 7); ctx.fill(); } else if (it.t === 'weapon') { ctx.fillStyle = it.w.col; ctx.beginPath(); ctx.roundRect(it.x - 14, it.y - 5, 28, 10, 3); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.fillText(it.w.n, it.x, it.y - 14); ctx.font = '22px sans-serif'; } else ctx.fillText({ chest: '🎁', heart: '❤️', portal: '🌀' }[it.t], it.x, it.y); });
-      effects.forEach(f => { if (f.t === 'boom') { ctx.globalAlpha = f.life * 3; ctx.fillStyle = '#f97316'; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 7); ctx.fill(); ctx.globalAlpha = 1; } else { ctx.strokeStyle = '#c4b5fd'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(f.x, f.y, 55, f.a - 1, f.a + 1); ctx.stroke(); } });
-      enemies.forEach(e => { ctx.font = (e.r * 1.6) + 'px sans-serif'; ctx.globalAlpha = e.hurt > 0 ? 0.4 : 1; ctx.fillText(e.e, e.x, e.y); ctx.globalAlpha = 1; if (e.hp < e.maxhp) { ctx.fillStyle = '#111'; ctx.fillRect(e.x - 16, e.y - e.r - 10, 32, 5); ctx.fillStyle = '#ef4444'; ctx.fillRect(e.x - 16, e.y - e.r - 10, 32 * e.hp / e.maxhp, 5); } });
-      bullets.forEach(b => { ctx.fillStyle = b.col; ctx.beginPath(); ctx.arc(b.x, b.y, b.splash ? 6 : 4, 0, 7); ctx.fill(); }); ebullets.forEach(b => { ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, 7); ctx.fill(); ctx.fillStyle = '#fca5a5'; ctx.beginPath(); ctx.arc(b.x, b.y, 2, 0, 7); ctx.fill(); });
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+        if (!map[y][x]) { tile(ctx, SPR.floors[hashXY(x, y) % SPR.floors.length], x * T, y * T); continue; }
+        const faceDown = y + 1 < ROWS && !map[y + 1][x]; const nearFloor = [[1, 0], [-1, 0], [0, -1], [0, 1], [1, 1], [-1, 1], [1, -1], [-1, -1]].some(([dx, dy]) => map[y + dy] && map[y + dy][x + dx] === 0);
+        if (!nearFloor) { ctx.fillStyle = '#0a0a14'; ctx.fillRect(x * T, y * T, T, T); continue; }
+        if (faceDown) { tile(ctx, hashXY(x, y) % 9 === 0 ? SPR.torch : SPR.wallFace, x * T, y * T); } else tile(ctx, SPR.wallTop, x * T, y * T);
+      }
+      decor.forEach(d => tile(ctx, d.t, d.x * T, d.y * T));
+      rooms.forEach(r => { if (r.locked) r.doors.forEach(([dx, dy]) => tile(ctx, SPR.doorLocked, dx * T, dy * T)); });
+      // тени под сущностями
+      const shadow = (x, y, r) => { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(x, y + r * 0.9, r * 0.9, r * 0.35, 0, 0, 7); ctx.fill(); };
+      const tnow = performance.now() / 1000;
+      items.forEach(it => { if (it.t === 'coin') { ctx.save(); ctx.translate(it.x, it.y + Math.sin(tnow * 6 + it.x) * 2); tile(ctx, SPR.coin, -8, -8, 16, 16); ctx.restore(); } else if (it.t === 'weapon') { shadow(it.x, it.y, 10); ctx.save(); ctx.translate(it.x, it.y + Math.sin(tnow * 4) * 3); tile(ctx, WICON[it.w.n] || 104, -14, -14, 28, 28); ctx.restore(); ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(it.w.n, it.x, it.y - 22); } else if (it.t === 'portal') { ctx.fillStyle = 'rgba(52,211,153,' + (0.25 + Math.sin(tnow * 4) * 0.15) + ')'; ctx.beginPath(); ctx.arc(it.x, it.y, 26, 0, 7); ctx.fill(); tile(ctx, SPR.portal, it.x - 16, it.y - 16); } else { shadow(it.x, it.y, 12); tile(ctx, it.t === 'chest' ? SPR.chest : SPR.heart, it.x - 16, it.y - 16); } });
+      effects.forEach(f => { if (f.t === 'boom') { const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r); g.addColorStop(0, 'rgba(255,240,150,' + f.life * 3 + ')'); g.addColorStop(1, 'rgba(249,115,22,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 7); ctx.fill(); } else { ctx.strokeStyle = 'rgba(196,181,253,' + f.life * 6 + ')'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(f.x, f.y, 52, f.a - 1, f.a + 1); ctx.stroke(); } });
+      enemies.forEach(e => { const sz = e.type === 'boss' ? 64 : 32; shadow(e.x, e.y, sz / 2 - 4); ctx.globalAlpha = e.hurt > 0 ? 0.5 : 1; const bob = Math.sin(tnow * 8 + e.x) * 1.5; tile(ctx, SPR[e.type], e.x - sz / 2, e.y - sz / 2 + bob, sz, sz, e.x > p.x); ctx.globalAlpha = 1; if (e.hp < e.maxhp) { ctx.fillStyle = '#111'; ctx.fillRect(e.x - 16, e.y - sz / 2 - 8, 32, 5); ctx.fillStyle = '#ef4444'; ctx.fillRect(e.x - 16, e.y - sz / 2 - 8, 32 * e.hp / e.maxhp, 5); } });
+      bullets.forEach(b => { ctx.shadowColor = b.col; ctx.shadowBlur = 8; ctx.fillStyle = b.col; ctx.beginPath(); ctx.arc(b.x, b.y, b.splash ? 6 : 4, 0, 7); ctx.fill(); ctx.shadowBlur = 0; });
+      ebullets.forEach(b => { ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 8; ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, 7); ctx.fill(); ctx.shadowBlur = 0; ctx.fillStyle = '#fecaca'; ctx.beginPath(); ctx.arc(b.x, b.y, 2, 0, 7); ctx.fill(); });
       // игрок
-      ctx.globalAlpha = p.hurt > 0 && Math.floor(p.hurt * 20) % 2 ? 0.3 : 1; ctx.fillStyle = '#8b5cf6'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); ctx.fillStyle = '#c4b5fd'; ctx.beginPath(); ctx.arc(p.x, p.y - 4, 8, 0, 7); ctx.fill(); ctx.fillStyle = '#1e1b4b'; ctx.fillRect(p.x - 4 + Math.cos(p.a) * 3, p.y - 6, 2, 3); ctx.fillRect(p.x + 2 + Math.cos(p.a) * 3, p.y - 6, 2, 3);
-      const w = p.weapons[p.wi]; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a); ctx.fillStyle = w.col; ctx.fillRect(6, -3, w.melee ? 26 : 18, 6); ctx.restore(); ctx.globalAlpha = 1;
+      shadow(p.x, p.y, 14); ctx.globalAlpha = p.hurt > 0 && Math.floor(p.hurt * 20) % 2 ? 0.3 : 1; const moving = joy && Math.hypot(joy.dx, joy.dy) > 6; const pb = moving ? Math.abs(Math.sin(tnow * 12)) * 3 : 0; tile(ctx, SPR.player, p.x - 16, p.y - 18 - pb, 32, 32, Math.cos(p.a) < 0);
+      const w = p.weapons[p.wi]; ctx.save(); ctx.translate(p.x, p.y + 2); ctx.rotate(p.a + Math.PI / 4); tile(ctx, WICON[w.n] || 104, -4, -22, 24, 24); ctx.restore(); ctx.globalAlpha = 1;
       ctx.restore();
+      // виньетка
+      const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.55)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
       // HUD
       ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(0, 0, W, 54); ctx.font = '16px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
       let hs = ''; for (let i = 0; i < buffs.maxhp; i++) hs += i < p.hp ? '❤️' : '🖤'; ctx.fillText(hs, 8, 14); let as = ''; for (let i = 0; i < 6; i++) as += i < Math.floor(p.armor) ? '🛡' : '·'; ctx.fillText(as, 8, 38);
