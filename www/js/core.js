@@ -250,6 +250,43 @@
   }
 
   /* ---------- проверка обновлений через GitHub Releases ---------- */
+  const updater = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Updater) || null;
+  /* скачивание APK внутри приложения + запуск установщика */
+  async function runUpdate(url, tag) {
+    const U = updater();
+    if (!U) { const a = h('a', { href: url, target: '_blank' }); document.body.append(a); a.click(); a.remove(); return; }
+    try {
+      const can = await U.canInstall();
+      if (!can.value) {
+        modal({ title: 'Нужно разрешение', text: 'Android требует разрешить этому приложению установку обновлений. Откройте настройки и включите переключатель, затем вернитесь и нажмите «Обновить» снова.',
+          buttons: [{ label: 'Отмена' }, { label: 'Открыть настройки', cls: 'primary', onClick: () => U.openInstallSettings() }] });
+        return;
+      }
+    } catch (e) {}
+    // окно прогресса
+    const barFill = h('div', { style: 'height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .15s' });
+    const bar = h('div', { style: 'height:14px;background:var(--bg2);border-radius:7px;overflow:hidden;margin:6px 0' }, barFill);
+    const label = h('div', { class: 'hint-text' }, 'Подготовка…');
+    const root = $('#modal-root'); root.innerHTML = '';
+    const box = h('div', { class: 'modal' }, h('h2', null, 'Обновление ' + tag.replace(/^v/, '')), bar, label);
+    root.append(box);
+    let sub;
+    try {
+      sub = await U.addListener('progress', ev => {
+        const pct = ev.total > 0 ? Math.round(ev.loaded / ev.total * 100) : 0;
+        barFill.style.width = (ev.total > 0 ? pct : 50) + '%';
+        label.textContent = (ev.loaded / 1048576).toFixed(1) + ' МБ' + (ev.total > 0 ? ' из ' + (ev.total / 1048576).toFixed(1) + ' МБ · ' + pct + '%' : '');
+      });
+      await U.download({ url });
+      barFill.style.width = '100%'; label.textContent = 'Загружено. Открываю установщик…'; sound('good');
+      await U.install();
+      setTimeout(() => { root.innerHTML = ''; toast('Подтвердите установку'); }, 1200);
+    } catch (e) {
+      root.innerHTML = '';
+      modal({ title: 'Не удалось обновить', text: (e && e.message) || 'Ошибка загрузки', buttons: [{ label: 'Отмена' }, { label: 'Открыть в браузере', cls: 'primary', onClick: () => { const a = h('a', { href: url, target: '_blank' }); document.body.append(a); a.click(); a.remove(); } }] });
+    } finally { if (sub && sub.remove) sub.remove(); }
+  }
+
   const cmpVer = (a, b) => { const pa = String(a).replace(/^v/, '').split('.').map(Number), pb = String(b).replace(/^v/, '').split('.').map(Number); for (let i = 0; i < Math.max(pa.length, pb.length); i++) { const d = (pa[i] || 0) - (pb[i] || 0); if (d) return d; } return 0; };
   async function checkUpdate(manual) {
     if (!APP.repo) { if (manual) modal({ title: 'Обновления', text: 'Репозиторий не настроен в этой сборке.' }); return; }
@@ -262,8 +299,9 @@
       state.lastUpdateCheck = Date.now(); save();
       if (cmpVer(tag, APP.version) > 0 && apk) {
         const notes = (rel.body || '').split(String.fromCharCode(10)).slice(0, 8).join(' ');
-        modal({ title: 'Доступна версия ' + tag.replace(/^v/, ''), text: (notes || 'Новое обновление.') + ' — Скачается APK — откройте его и нажмите «Обновить». Прогресс сохранится.',
-          buttons: [{ label: 'Позже' }, { label: 'Скачать', cls: 'primary', onClick: () => { const a = h('a', { href: apk.browser_download_url, target: '_blank' }); document.body.append(a); a.click(); a.remove(); } }] });
+        const mb = (apk.size / 1048576).toFixed(1);
+        modal({ title: 'Доступна версия ' + tag.replace(/^v/, ''), text: (notes || 'Новое обновление.') + ' — размер ' + mb + ' МБ. Прогресс сохранится.',
+          buttons: [{ label: 'Позже' }, { label: 'Обновить', cls: 'primary', onClick: () => runUpdate(apk.browser_download_url, tag) }] });
       } else if (manual) modal({ title: 'Обновлений нет', text: 'У вас последняя версия v' + APP.version + '.' });
     } catch (e) { if (manual) modal({ title: 'Не удалось проверить', text: e.message }); }
   }
