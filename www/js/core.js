@@ -40,6 +40,16 @@
   function vibrate(ms) { if (state.vibro && navigator.vibrate) { try { navigator.vibrate(ms || 15); } catch (e) {} } }
   document.addEventListener('pointerdown', () => { if (state.sound) ac(); }, { once: true });
 
+  /* ---------- таймеры игры: при выходе из игры все её отложенные вызовы отменяются,
+     иначе они продолжают рисовать поверх другого экрана ---------- */
+  const _st = window.setTimeout.bind(window), _si = window.setInterval.bind(window), _ct = window.clearTimeout.bind(window), _ci = window.clearInterval.bind(window);
+  let gameTimers = null;
+  window.setTimeout = function (fn, ms, ...a) { const id = _st(function () { if (gameTimers) gameTimers.delete(id); if (typeof fn === 'function') fn.apply(this, a); }, ms); if (gameTimers) gameTimers.add(id); return id; };
+  window.setInterval = function (fn, ms, ...a) { const id = _si(fn, ms, ...a); if (gameTimers) gameTimers.add(-id - 1); return id; };
+  window.clearTimeout = id => { if (gameTimers) gameTimers.delete(id); _ct(id); };
+  window.clearInterval = id => { if (gameTimers) gameTimers.delete(-id - 1); _ci(id); };
+  function killGameTimers() { if (gameTimers) gameTimers.forEach(id => id < 0 ? _ci(-id - 1) : _ct(id)); gameTimers = null; }
+
   /* ---------- UI helpers ---------- */
   const $ = (s, r) => (r || document).querySelector(s);
   function h(tag, attrs, ...kids) {
@@ -57,7 +67,7 @@
   let toastT;
   function toast(msg) {
     const t = $('#toast'); t.textContent = msg; t.classList.add('show');
-    clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 1600);
+    _ct(toastT); toastT = _st(() => t.classList.remove('show'), 1600);
   }
   function modal(opts) {
     const root = $('#modal-root'); root.innerHTML = '';
@@ -193,7 +203,7 @@
     $('#btn-back').classList.remove('hidden');
     setTitle(def.title);
     state.totalPlays++; save();
-    current = def;
+    current = def; gameTimers = new Set();
     try { def.mount(screen, api); } catch (e) { console.error(e); toast('Ошибка: ' + e.message); }
     addSkipButton(def, screen);
   }
@@ -243,7 +253,7 @@
   });
   function closeCurrent() {
     if (current && current.unmount) { try { current.unmount(); } catch (e) {} }
-    current = null; $('#modal-root').innerHTML = '';
+    killGameTimers(); current = null; $('#modal-root').innerHTML = '';
   }
   function showHub() {
     closeCurrent();

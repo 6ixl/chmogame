@@ -254,10 +254,10 @@
   Games.register({
     id: 'nim', title: 'Ним', icon: '🥢', cat: 'board', desc: 'Бери 1–3 палочки. Кто берёт последнюю — проиграл', bestLabel: 'Побед',
     mount(screen, api) {
-      const { h } = api; let n, st = stats(api, 'nim'), over, diff = 1;
-      function start() { n = api.rand(15, 25); over = false; render(); }
-      function render() { screen.innerHTML = ''; api.header(screen, [{ label: 'Палочек', value: n }, { label: '', value: st.txt() }]); screen.append(h('div', { class: 'game-area', style: 'gap:24px' }, h('div', { style: 'font-size:28px;letter-spacing:4px;text-align:center;line-height:1.4;max-width:320px' }, '🥢'.repeat(n)), h('div', { class: 'row' }, [1, 2, 3].map(k => h('button', { class: 'btn primary', style: 'font-size:20px;padding:14px 22px', disabled: k > n || over ? '' : null, onclick: () => take(k) }, 'Взять ' + k))))); }
-      function take(k) { n -= k; api.sound('tap'); if (n <= 0) { over = true; st.lose(); render(); api.end({ win: false, title: 'Вы взяли последнюю', onAgain: start }); return; } render(); setTimeout(() => { let t = (n - 1) % 4; if (t === 0 || diff === 0 || (diff === 1 && Math.random() < 0.35)) t = api.rand(1, Math.min(3, n)); n -= t; api.sound('select'); if (n <= 0) { over = true; st.win(); render(); api.end({ title: 'Компьютер взял последнюю — победа!', reward: 15, onAgain: start }); } else render(); }, 500); }
+      const { h } = api; let n, st = stats(api, 'nim'), over, diff = 1, busy;
+      function start() { n = api.rand(15, 25); over = false; busy = false; render(); }
+      function render() { screen.innerHTML = ''; api.header(screen, [{ label: 'Палочек', value: n }, { label: '', value: st.txt() }]); screen.append(h('div', { class: 'game-area', style: 'gap:24px' }, h('div', { style: 'font-size:28px;letter-spacing:4px;text-align:center;line-height:1.4;max-width:320px' }, '🥢'.repeat(Math.max(0, n))), h('div', { class: 'row' }, [1, 2, 3].map(k => h('button', { class: 'btn primary', style: 'font-size:20px;padding:14px 22px', disabled: k > n || over || busy ? '' : null, onclick: () => take(k) }, 'Взять ' + k))))); }
+      function take(k) { if (over || busy || k > n) return; n -= k; api.sound('tap'); if (n <= 0) { over = true; st.lose(); render(); api.end({ win: false, title: 'Вы взяли последнюю', onAgain: start }); return; } busy = true; render(); setTimeout(() => { busy = false; let t = (n - 1) % 4; if (t === 0 || diff === 0 || (diff === 1 && Math.random() < 0.35)) t = api.rand(1, Math.min(3, n)); n -= t; api.sound('select'); if (n <= 0) { over = true; st.win(); render(); api.end({ title: 'Компьютер взял последнюю — победа!', reward: 15, onAgain: start }); } else render(); }, 500); }
       api.difficulty('nim', d => { diff = d; start(); });
     }
   });
